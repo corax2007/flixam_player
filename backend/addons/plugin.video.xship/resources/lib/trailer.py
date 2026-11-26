@@ -41,7 +41,7 @@ _JUNK_WORDS = [
 _TRAILER_WORDS = ['trailer', 'teaser', 'official']
 
 # Built-in API key (base64) — used for cheap 1-unit videos.list verification + user key detection
-_API_CHECKSUM_B64 = b'QUl6YVN5RG5sSjBlX0NabExvWm03Q01Obk80MXhJblpnVkZ5T2Jv'
+_API_CHECKSUM_B64 = b''  # eigener YouTube-Key noetig (nicht im Repo)
 
 import base64 as _b64
 _api_checksum = _b64.b64decode(_API_CHECKSUM_B64).decode() if _API_CHECKSUM_B64 else ''

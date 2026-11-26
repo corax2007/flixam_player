@@ -49,6 +49,10 @@ werden:
 
 Ohne Key funktionieren die TMDB-Funktionen nicht.
 
+Die ehemals in den Kodi-Addons eingebetteten YouTube-OAuth-/API-Keys wurden
+entfernt. Wer die YouTube-Suche der Addons nutzen will, muss eigene Keys in
+`plugin.video.youtube/api_keys.json` hinterlegen (nicht versioniert).
+
 ## Linux starten
 
 ```bash
