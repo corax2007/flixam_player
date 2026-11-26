@@ -1,0 +1,875 @@
+<?xml version="1.0" ?>
+<settings version="1">
+	<section id="plugin.video.xstream">
+		<category id="indexsite1" label="30094">
+			<group id="animetoast" label="30838">
+				<setting id="plugin_animetoast" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_animetoast" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_animetoast">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_animetoast_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_animetoast">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_animetoast">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_animetoast.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_animetoast">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_animetoast">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_animetoast_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="aniworld" label="30700">
+				<setting id="plugin_aniworld" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_aniworld" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_aniworld">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_aniworld_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_aniworld">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_aniworld">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_aniworld.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_aniworld">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_aniworld">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_aniworld_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="burningseries" label="30703">
+				<setting id="plugin_burningseries" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_burningseries" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_burningseries">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_burningseries_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_burningseries">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_burningseries">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_burningseries.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_burningseries">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_burningseries">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_burningseries_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_burningseries_captchaoff" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>neu</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="edit" format="string"/>
+				</setting>
+			</group>
+			<group id="einschalten" label="30705">
+				<setting id="plugin_einschalten" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_einschalten" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_einschalten">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_einschalten_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_einschalten">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_einschalten">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_einschalten.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_einschalten">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_einschalten">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_einschalten_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="filmo" label="30873">
+				<setting id="plugin_filmo" type="boolean" label="30050" help="30411">
+					<level>0</level>
+                    <default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_filmo" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_filmo">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_filmo_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_filmo">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_filmo">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_filmo.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_filmo">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_filmo">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_filmo_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="filmpalast" label="30702">
+				<setting id="plugin_filmpalast" type="boolean" label="30050" help="30411">
+					<level>0</level>
+                    <default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_filmpalast" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_filmpalast">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_filmpalast_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_filmpalast">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_filmpalast">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_filmpalast.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_filmpalast">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_filmpalast">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_filmpalast_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="hdfilme" label="30704">
+				<setting id="plugin_hdfilme" type="boolean" label="30050" help="30411">
+					<level>0</level>
+                    <default>True</default>
+					<control type="toggle"/>
+				</setting>				
+				<setting id="global_search_hdfilme" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_hdfilme">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_hdfilme_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_hdfilme">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_hdfilme">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_hdfilme.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_hdfilme">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_hdfilme">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_hdfilme_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="internetarchive" label="30712">
+				<setting id="plugin_internetarchive" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_internetarchive" type="boolean" label="30052">
+					<level>0</level>
+					<default>False</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_internetarchive">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_internetarchive_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="kellerkino" label="30880">
+				<setting id="plugin_kellerkino" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_kellerkino" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_kellerkino">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_kellerkino_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_kellerkino">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_kellerkino">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_kellerkino.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_kellerkino">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_kellerkino">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_kellerkino_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="kinoger" label="30717">
+				<setting id="plugin_kinoger" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_kinoger" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_kinoger">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_kinoger_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_kinoger">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_kinoger">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_kinoger.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_kinoger">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_kinoger">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_kinoger_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="megakino" label="30710">
+				<setting id="plugin_megakino" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_megakino" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_megakino">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_megakino_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_megakino">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_megakino">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_megakino.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_megakino">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_megakino">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_megakino_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="moflix-stream" label="30728">
+				<setting id="plugin_moflix-stream" type="boolean" label="30050" help="30411">
+					<level>0</level>
+                    <default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_moflix-stream" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_moflix-stream">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_moflix-stream_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_moflix-stream">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_moflix-stream">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_moflix-stream.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_moflix-stream">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_moflix-stream">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_moflix-stream_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="movie2k" label="30715">
+				<setting id="plugin_movie2k" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_movie2k" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_movie2k">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_movie2k_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_movie2k">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_movie2k">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_movie2k.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_movie2k">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_movie2k">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_movie2k_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="netzkino" label="30713">
+				<setting id="plugin_netzkino" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_netzkino" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_netzkino">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_netzkino_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_netzkino">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_netzkino">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_netzkino.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_netzkino">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_netzkino">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_netzkino_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="serienstream" label="30714">
+				<setting id="plugin_serienstream" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_serienstream" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_serienstream">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_serienstream_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_serienstream">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_serienstream">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_serienstream.domain" type="string" label="30278">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_serienstream">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_serienstream">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_serienstream_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+			<group id="streamcloud" label="30725">
+				<setting id="plugin_streamcloud" type="boolean" label="30050" help="30411">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="global_search_streamcloud" type="boolean" label="30052">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_streamcloud">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_streamcloud_checkDomain" type="boolean" label="30277">
+					<level>0</level>
+					<default>True</default>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_streamcloud">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_streamcloud">false</dependency>
+					</dependencies>
+					<control type="toggle"/>
+				</setting>
+				<setting id="plugin_streamcloud.domain" type="string" label="30278" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="plugin_streamcloud">false</dependency>
+						<dependency type="visible" operator="!is" setting="plugin_streamcloud">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30278</heading>
+					</control>
+				</setting>
+				<setting id="plugin_streamcloud_status" type="string" label="Dummy" help="">
+					<visible>false</visible>
+					<default>true</default>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="toggle"/>
+				</setting>
+			</group>
+		</category>
+		<category id="hoster" label="30034" help="">
+			<group id="hoster" label="30034">
+				<setting id="prefLanguage" type="string" label="30002" help="30411">
+					<level>0</level>
+					<default>0</default>
+					<constraints>
+						<options>
+							<option label="30105" help="All">0</option>
+							<option label="30103" help="German">1</option>
+							<option label="30104" help="English">2</option>
+							<option label="30194" help="Japanese">3</option>
+						</options>
+					</constraints>
+					<control type="spinner" format="string"/>
+				</setting>
+				<setting id="hosterSelect" type="string" label="30005" help="">
+					<level>0</level>
+					<default>Dialog</default>
+					<constraints>
+						<options>
+							<option label="30129">Dialog</option>
+							<option label="30130">Auto</option>
+							<option label="30131">List</option>
+						</options>
+					</constraints>
+					<control type="spinner" format="string"/>
+				</setting>
+				<setting id="blockedHoster" type="string" label="30404" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="edit" format="string">
+						<heading>30404</heading>
+					</control>
+				</setting>
+			</group>
+		</category>
+		<category id="networkSettings" label="30035" help="">
+			<group id="networkSettings" label="30035">
+				<!-- Die Pruefung abzuschalten ist der Notausgang, falls sie eine Seite zu Unrecht aussperrt (etwa hinter einem
+				     Proxy, dessen Zertifikat das Geraet nicht kennt). Abrufe mit einem Schluessel (2Captcha, TMDB) pruefen
+				     auch dann -->
+				<setting id="sslVerify" type="boolean" label="30924" help="">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="bypassDNSlock" type="boolean" label="30025" help="">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="requestTimeout" type="integer" label="30014" help="">
+					<level>0</level>
+					<default>10</default>
+					<constraints>
+						<minimum>5</minimum>
+						<maximum>120</maximum>
+					</constraints>
+					<control type="edit" format="integer">
+						<heading>30014</heading>
+					</control>
+				</setting>
+				<setting id="volatileHtmlCache" type="boolean" label="30029" help="">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="cacheTime" type="integer" label="30006" help="">
+					<level>0</level>
+					<default>1</default>
+					<control type="edit" format="integer">
+						<heading>30006</heading>
+					</control>
+				</setting>
+				<setting id="cacheDeltaDay" type="integer" label="30164" help="">
+					<level>0</level>
+					<default>2</default>
+					<!-- ausgegraut, solange der RAM-Cache an ist: das Loeschen laeuft nur beim Kodi-Start (service.delHtmlCache),
+					     da ist der RAM-Cache leer, und im RAM-Modus schreibt der requestHandler keine Cache-Dateien -->
+					<dependencies>
+						<dependency type="enable" operator="is" setting="volatileHtmlCache">false</dependency>
+					</dependencies>
+					<control type="edit" format="integer">
+						<heading>30164</heading>
+					</control>
+				</setting>
+			</group>
+		</category>
+		<category id="captcha" label="30323" help="">
+			<group id="2captchaacc" label="30324">
+				<setting id="captcha.enabled" type="boolean" label="30882" help="">
+					<level>0</level>
+					<default>True</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="2captcha.pass" type="string" label="30436" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="captcha.enabled">false</dependency>
+					</dependencies>
+					<control type="edit" format="string">
+						<heading>30436</heading>
+						<hidden>true</hidden>
+					</control>
+				</setting>
+				<setting id="captcha.timeout" type="integer" label="30329" help="">
+					<level>0</level>
+					<default>120</default>
+					<constraints>
+						<minimum>10</minimum>
+						<maximum>600</maximum>
+					</constraints>
+					<dependencies>
+						<dependency type="enable" operator="!is" setting="captcha.enabled">false</dependency>
+					</dependencies>
+					<control type="edit" format="integer">
+					<heading>30329</heading>
+					</control>
+				</setting>
+			</group>
+		</category>
+		<category id="tmdb" label="30174" help="">
+			<group id="tmdbsettings" label="30839">
+				<setting id="TMDBMETA" type="boolean" label="30004" help="">
+					<level>0</level>
+					<default>False</default>
+					<control type="toggle"/>
+				</setting>
+				<setting id="tmdb_user_api_key" type="string" label="30835" help="">
+					<level>0</level>
+					<default/>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="edit" format="string">
+						<heading>30835</heading>
+					</control>
+				</setting>
+			</group>
+		</category>
+	</section>
+</settings>

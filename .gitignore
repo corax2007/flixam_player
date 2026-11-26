@@ -1,0 +1,39 @@
+# --- Geheimnisse / lokale Konfiguration -----------------------------------
+# TMDB-API-Key (nur lokal, nie ins Repo)
+.env
+backend/.env
+~/.flixam_tmdb_key
+
+# WireGuard-Privatkey und wireproxy-Binary
+vpn/wg0.conf
+vpn/wireproxy
+
+# Persoenliche Daten / Fortschritt / Cookies / Cache
+.flixam_player_prefs.json
+.flixam_player_settings.json
+.flixam_sources.json
+backend/kodi_data/
+
+# --- Python ---------------------------------------------------------------
+backend/venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+
+# --- Flutter / Dart --------------------------------------------------------
+frontend/build/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/android/.gradle/
+frontend/android/build/
+frontend/android/local.properties
+frontend/linux/build/
+
+# --- Logs / Editor / System ------------------------------------------------
+*.log
+*.tmp
+.DS_Store
+.idea/
+*.iml

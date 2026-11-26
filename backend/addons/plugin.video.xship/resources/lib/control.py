@@ -1,0 +1,330 @@
+
+
+#2021-07-20
+#edit 2026-08-17
+
+import os, sys
+import xbmc, xbmcplugin, xbmcaddon, xbmcgui, xbmcvfs
+def iteritems(d):
+    # Python 3 dict iterator (replaces six.iteritems); re-exported for indexers.
+    return iter(d.items())
+
+is_python2 = sys.version_info.major == 2
+
+if is_python2:
+    #from xbmc import translatePath
+    from HTMLParser import HTMLParser
+    unescape = HTMLParser().unescape
+    from urlparse import urlparse, parse_qsl, urljoin, parse_qs, urlsplit
+    from urllib import quote_plus, unquote_plus, quote, unquote, urlencode, urlretrieve
+    from urllib2 import Request, urlopen
+else:
+    #from xbmcvfs import translatePath
+    from html import unescape
+    from html.parser import HTMLParser
+    from urllib.parse import urlparse, quote_plus, parse_qsl, unquote_plus, urljoin, quote, unquote, urlencode, parse_qs, urlsplit
+    from urllib.request import Request, urlopen, urlretrieve
+
+def translatePath(*args):
+    if is_python2: return xbmc.translatePath(*args).decode("utf-8")
+    else: return xbmcvfs.translatePath(*args)
+
+def exists(*args):
+    return os.path.exists(translatePath(*args))
+
+def py2_decode(value):
+    if is_python2:
+        try: return value.decode('utf-8')
+        except: return value
+    return value
+
+def py2_encode(value):
+    if is_python2:
+        try: return value.encode('utf-8')
+        except: return value
+    return value
+## from six
+## iteritems = lambda d: ((hasattr(d, 'iteritems') and d.iteritems) or d.items)()
+
+# xbmcaddon
+Addon = xbmcaddon.Addon()
+addonInfo = xbmcaddon.Addon().getAddonInfo
+addonId = addonInfo('id')       # 'plugin.video.xship'
+addonName = addonInfo('name')   # 'Xship'
+addonVersion = addonInfo('version')
+addonPath = translatePath(addonInfo('path'))   # 'C:\\Program Files\\Kodi21\\portable_data\\addons\\plugin.video.xship\\'
+addonProfilePath = translatePath(addonInfo('profile')) # 'C:\\Program Files\\Kodi21\\portable_data\\userdata\\addon_data\\plugin.video.xship\\'
+
+# dataPath = py2_decode(translatePath(addonInfo('profile')))
+
+cachePath = os.path.join(addonProfilePath, "cache")
+if not exists(cachePath): os.makedirs(cachePath)
+
+setSetting = xbmcaddon.Addon().setSetting
+_getSetting = xbmcaddon.Addon().getSetting
+
+def getSetting(Name, default=''):
+    result = _getSetting(Name)
+    if result:
+        return result
+    else:
+        return default
+
+
+def bold(text):
+    # Fettschrift optional (Lesbarkeit/Barrierefreiheit), gesteuert via Setting 'bold_labels'.
+    # Default AN: nur bei explizit 'false' weglassen (ungesetzter Wert -> Fett, greift
+    # also sofort beim allerersten Start vor dem Speichern).
+    if getSetting('bold_labels') == 'false':
+        return '%s' % text
+    return '[B]%s[/B]' % text
+
+# xbmc
+skin = xbmc.getSkinDir()
+infoLabel = xbmc.getInfoLabel
+condVisibility = xbmc.getCondVisibility
+playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
+keyboard = xbmc.Keyboard
+
+
+# kb = xbmc.Keyboard('default', 'heading', True)
+# kb.setDefault('password') # optional
+# kb.setHeading('Enter password') # optional
+# kb.setHiddenInput(True) # optional
+# kb.doModal()
+# if (kb.isConfirmed()):
+#   text = kb.getText()
+
+
+execute = xbmc.executebuiltin
+executebuiltin  = xbmc.executebuiltin
+player = xbmc.Player()
+abortRequested = xbmc.Monitor().abortRequested()
+jsonrpc = xbmc.executeJSONRPC
+getInfoLabel = xbmc.getInfoLabel
+
+
+# xbmcvfs
+listDir = xbmcvfs.listdir
+openFile = xbmcvfs.File
+makeFile = xbmcvfs.mkdir
+mkDir = xbmcvfs.mkdir
+delete = xbmcvfs.delete
+# exists = xbmcvfs.exists
+
+# xbmcplugin
+resolveUrl = xbmcplugin.setResolvedUrl
+addItem = xbmcplugin.addDirectoryItem
+endofdirectory = xbmcplugin.endOfDirectory
+content = xbmcplugin.setContent
+plugincategory = xbmcplugin.setPluginCategory
+
+def sortLabel(syshandle):
+    xbmcplugin.addSortMethod(syshandle, xbmcplugin.SORT_METHOD_LABEL)
+
+def trailerLabel():
+    """Return localised context menu label for the trailer action."""
+    try:
+        lang = xbmc.getLanguage(xbmc.ISO_639_1).lower()[:2]
+    except Exception:
+        lang = 'en'
+    return 'Trailer ansehen' if lang == 'de' else 'Watch Trailer'
+
+def hasTrailerPlayer():
+    """Always True - IMDB provides direct MP4 playback without any YouTube player.
+    Context menu 'Trailer ansehen' is shown for every item."""
+    return True
+
+# xbmcgui
+window = xbmcgui.Window(10000)
+currentWindowId = xbmcgui.Window(xbmcgui.getCurrentWindowId())
+item = xbmcgui.ListItem
+dialog = xbmcgui.Dialog()
+progressDialog = xbmcgui.DialogProgress()
+progressDialogBG = xbmcgui.DialogProgressBG()
+
+dataPath = py2_decode(translatePath(addonInfo('profile')))
+
+bookmarksFile = os.path.join(addonProfilePath, 'bookmarks.db')
+settingsFile = os.path.join(addonPath, 'resources', 'settings.xml')
+
+def addonIcon():
+    return addonInfo('icon')
+
+def addonFanart():
+    return addonInfo('fanart')
+
+def artPath():
+    return os.path.join(translatePath(addonInfo('path')), 'resources', 'media')
+
+def addonThumb():
+    return os.path.join(artPath(), 'poster.png')
+
+def addonPoster():
+    return os.path.join(artPath(), 'poster.png')
+
+def addonBanner():
+    return os.path.join(artPath(), 'banner.png')
+
+#def addonFanart():
+#    addonXml = os.path.join(py2_decode(translatePath(addonInfo('path'))), 'addon.xml')
+#    import xml.dom.minidom as minidom
+#    doc = minidom.parse(addonXml)
+#    # with open(addonXml, 'r') as f: content = f.read()
+#    # fanart = re.search('fanart>([^<]+)', content).group(1)
+#    fanart = doc.getElementsByTagName('fanart')[0].firstChild.nodeValue
+#    fanart = os.path.join(addonInfo('path'), os.path.normpath(fanart))
+#    if os.path.exists(fanart):
+#        return fanart
+#    return
+
+def addonNext():
+    #return os.path.join(artPath(), 'next.png')
+    return 'https://raw.githubusercontent.com/xsupdater/xsupdater/backup/logos/media/%s' % 'next.png'
+
+def addonNoPicture():
+    #return os.path.join(artPath(), 'no-picture.png')
+    return 'https://raw.githubusercontent.com/xsupdater/xsupdater/backup/logos/media/%s' % 'no-picture.png'
+
+def infoDialog(message, heading=addonInfo('name'), icon='', time=3000, sound=False):
+    if icon == '': icon = addonIcon()
+    elif icon == 'INFO': icon = xbmcgui.NOTIFICATION_INFO
+    elif icon == 'WARNING': icon = xbmcgui.NOTIFICATION_WARNING
+    elif icon == 'ERROR': icon = xbmcgui.NOTIFICATION_ERROR
+    dialog.notification(heading, message, icon, time, sound=sound)
+
+def yesnoDialog(line1, line2, line3, heading=addonInfo('name'), nolabel='', yeslabel=''):
+    if is_python2:
+        return dialog.yesno(heading, line1, line2, line3, nolabel, yeslabel)
+    else:
+        return dialog.yesno(heading, line1+'\n'+line2+'\n'+line3, nolabel, yeslabel)
+
+def selectDialog(list, heading=addonInfo('name')):
+    return dialog.select(heading, list)
+
+def showparentdiritems():
+    if not 'false' in xbmc.executeJSONRPC('{"jsonrpc":"2.0", "id":1, "method":"Settings.GetSettingValue", "params":{"setting":"filelists.showparentdiritems"}}'):
+        return True
+    else:
+        return False
+
+# Modified `sleep` command that honors a user exit request
+def sleep(time):
+    monitor = xbmc.Monitor()
+    while time > 0 and not monitor.abortRequested():
+        monitor.waitForAbort(min(1, time))
+        time = time - 1
+
+def getKodiVersion():
+    return xbmc.getInfoLabel("System.BuildVersion").split(".")[0]
+
+def busy():
+    if int(getKodiVersion()) >= 18:
+        return execute('ActivateWindow(busydialognocancel)')
+    else:
+        return execute('ActivateWindow(busydialog)')
+
+def idle():
+    if int(getKodiVersion()) >= 18:
+        return execute('Dialog.Close(busydialognocancel)')
+    else:
+        return execute('Dialog.Close(busydialog)')
+
+def visible():
+    if int(getKodiVersion()) >= 18 and xbmc.getCondVisibility('Window.IsActive(busydialognocancel)') == 1:
+        return True
+    return xbmc.getCondVisibility('Window.IsActive(busydialog)') == 1
+
+def reload_profile():
+    profil = xbmc.getInfoLabel('System.ProfileName')
+    sleep(500)
+    #if profil:
+    xbmc.executebuiltin('LoadProfile(' + profil + ',prompt)')
+
+def openSettings(query=None, id=addonInfo('id')):
+    try:
+        idle()
+        execute('Addon.OpenSettings(%s)' % id)
+        if query is None:
+            raise Exception()
+        if len(str(query).split('.')) == 1:
+            c = query
+            f = 0
+        else:  c, f = str(query).split('.')
+        if int(getKodiVersion()) >= 21:
+            execute('SetFocus(%i)' % (int(c)-200))
+            if int(f):execute('SetFocus(%i)' % (int(f)-180))
+        elif int(getKodiVersion()) >= 18:
+            execute('SetFocus(%i)' % (int(c)-100))              #   k19: -100
+            if int(f):execute('SetFocus(%i)' % (int(f)-80))     #   k19: -80
+        else:
+            execute('SetFocus(%i)' % (int(c) + 100))
+            if int(f):execute('SetFocus(%i)' % (int(f) + 200))
+    except:
+        return
+
+def resetSettings():
+    yes = yesnoDialog("Zurücksetzen der Settings (außer Konten)", '', 'Sind Sie sicher?')
+    if not yes: return
+    try:
+        vhskassette_user = getSetting('vhskassette.user')
+        vhskassette_pass = getSetting('vhskassette.pass')
+        aniworld_user = getSetting('aniworld.user')
+        aniworld_pass = getSetting('aniworld.pass')
+        serienstream_user = getSetting('serienstream.user')
+        serienstream_pass = getSetting('serienstream.pass')
+        subtitles_user = getSetting('subtitles.os_user')
+        subtitles_pass = getSetting('subtitles.os_pass')
+        #
+        captcha_provider = getSetting('captcha.provider')
+        captcha_pass = getSetting('2captcha.pass')
+        kw_pass = getSetting('9kw.pass')
+        #
+        tmdb = getSetting('api.tmdb')
+        youtube = getSetting('api.youtube')
+        fanart = getSetting('api.fanart.tv')
+        #debug = getSetting('status.debug')
+        SettingFile = os.path.join(translatePath(xbmcaddon.Addon().getAddonInfo('profile')), "settings.xml")
+        if xbmcvfs.exists(SettingFile): xbmcvfs.delete(SettingFile)
+        setSetting(id='vhskassette.user', value=vhskassette_user)
+        setSetting(id='vhskassette.pass', value=vhskassette_pass)
+        setSetting(id='aniworld.user', value=aniworld_user)
+        setSetting(id='aniworld.pass', value=aniworld_pass)
+        setSetting(id='serienstream.user', value=serienstream_user)
+        setSetting(id='serienstream.pass', value=serienstream_pass)
+        setSetting(id='subtitles.os_user', value=subtitles_user)
+        setSetting(id='subtitles.os_pass', value=subtitles_pass)
+        if subtitles_user != '' and subtitles_pass != '': setSetting(id='subtitles', value='true')
+        #
+        setSetting(id='captcha.provider', value=captcha_provider)
+        setSetting(id='2captcha.pass', value=captcha_pass)
+        setSetting(id='9kw.pass', value=kw_pass)
+        #
+        setSetting(id='api.tmdb', value=tmdb)
+        setSetting(id='api.youtube', value=youtube)
+        setSetting(id='api.fanart.tv', value=fanart)
+        #setSetting(id='status.debug', value=debug)
+        return True
+    except:
+        return
+
+
+def getSettingDefault(id):
+    import re
+    try:
+        settings = open(settingsFile, 'r')
+        value = ' '.join(settings.readlines())
+        value.strip('\n')
+        settings.close()
+        value = re.findall(r'id=\"%s\".*?default=\"(.*?)\"' % (id), value)[0]
+        return value
+    except:
+        return None
+
+def inAdvancedsettings(word=''):
+    advancedsettings = py2_decode(os.path.join(translatePath('special://userdata/'), "advancedsettings.xml"))
+    if exists(advancedsettings):
+        with open(advancedsettings, 'r') as file:
+            content = file.read()
+            if word in content: return True
+    return False

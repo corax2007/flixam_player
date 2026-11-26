@@ -1,0 +1,665 @@
+Scraper Struktur — Vollständige Anleitung für xShip Source Plugins
+===================================================================
+
+
+============================================================================
+1. IMPORTS
+============================================================================
+
+Alle verfügbaren Imports (Auswahl je nach Scraper):
+
+# Hoster-Prüfung
+from resources.lib.utils import isBlockedHoster       # Prüft + löst URL auf
+from resources.lib.utils import getHostDict            # Gibt Blockliste zurück
+from resources.lib.utils import getExtIDS              # Externe IDs via Trakt API
+
+# HTTP-Anfragen
+from resources.lib.requestHandler import cRequestHandler
+
+# Hilfsfunktionen aus control.py
+from resources.lib.control import getSetting           # Setting lesen
+from resources.lib.control import urljoin              # URLs zusammensetzen
+from resources.lib.control import urlparse             # URL parsen
+from resources.lib.control import quote, quote_plus    # URL-Encoding
+from resources.lib.control import unquote_plus         # URL-Decoding
+from resources.lib.control import setSetting           # Setting schreiben
+from resources.lib.control import infoDialog           # Kodi Notification
+
+# Scraper-Module
+from scrapers.modules import cleantitle                # Titel normalisieren
+from scrapers.modules import dom_parser                # HTML DOM parsen
+from scrapers.modules import source_utils              # Qualität erkennen, Domain strippen
+from scrapers.modules.tools import cParser             # Regex-Parsing
+from scrapers.modules.tools import cUtil               # HTML-Entities, Entschlüsselung
+
+# Logging
+from resources.lib import log_utils
+
+# Standard-Python
+import re
+import json
+import concurrent.futures
+
+Welcher Scraper nutzt was:
+  filmpalast:    dom_parser, source_utils, isBlockedHoster, concurrent.futures
+  serienstream:  cParser, getHostDict, isBlockedHoster (in resolve), log_utils
+  aniworld:      cParser, getHostDict, isBlockedHoster (in resolve), log_utils
+  kinokiste:     cParser, isBlockedHoster, setSetting
+  kinoger:       dom_parser, cParser, cUtil, isBlockedHoster, json, log_utils
+  megakino:      dom_parser, cParser, isBlockedHoster, quote_plus
+  moflix:        dom_parser, isBlockedHoster, json, quote
+  einschalten:   dom_parser, cParser, isBlockedHoster, json
+  hdfilme:       cParser, isBlockedHoster, quote
+  filmpro:       dom_parser, cParser, isBlockedHoster, quote_plus
+  netzkino:      dom_parser, isBlockedHoster, json, getExtIDS
+  kkiste:        dom_parser, cParser, isBlockedHoster, setSetting
+  streamcloud:   dom_parser, cParser, isBlockedHoster, setSetting
+
+
+============================================================================
+2. GRUNDKONFIGURATION
+============================================================================
+
+Jeder Scraper braucht drei Variablen am Anfang:
+
+SITE_IDENTIFIER = 'filmpalast'
+SITE_DOMAIN = 'filmpalast.to'
+SITE_NAME = SITE_IDENTIFIER.upper()
+
+Regeln:
+  - SITE_IDENTIFIER MUSS zum Dateinamen passen (ohne .py)
+  - SITE_DOMAIN ist der Fallback falls Settings leer sind
+  - SITE_NAME kann auch ein eigener String sein:
+    SerienStream: SITE_NAME = 'SerienStream'
+    AniWorld:     SITE_NAME = 'AniWorld'
+    Alle anderen: SITE_NAME = SITE_IDENTIFIER.upper()
+
+
+============================================================================
+3. KLASSEN-STRUKTUR
+============================================================================
+
+Jeder Scraper = eine Klasse namens "source" (MUSS so heißen).
+
+class source:
+    def __init__(self):    # Pflicht
+        ...
+    def run(self, ...):    # Pflicht — Quellen suchen
+        ...
+    def resolve(self, url): # Pflicht — URL auflösen
+        ...
+
+Optionale Hilfsmethoden:
+    def chk_year(self, ...):    # filmpalast — Jahr prüfen (parallel)
+    def getStreams(self, ...):   # kinokiste — Hoster extrahieren
+    def _get_session(self, ...): # serienstream, aniworld — Login-Session
+    def _quality(self, q):       # kinoger — Qualität auswerten
+    def content_decryptor(...):  # kinoger — verschlüsselte Inhalte
+
+
+============================================================================
+4. __init__() — Konfiguration
+============================================================================
+
+--- Standard (die meisten Scraper) ---
+
+def __init__(self):
+    self.priority = 1
+    self.language = ['de']
+    self.domain = getSetting('provider.' + SITE_IDENTIFIER + '.domain', SITE_DOMAIN)
+    self.base_link = 'https://' + self.domain
+
+--- Mit IP-Fallback (SerienStream, AniWorld) ---
+
+def __init__(self):
+    self.priority = 1
+    self.language = ['de']
+    self.domain = getSetting('provider.' + SITE_IDENTIFIER + '.domain', SITE_DOMAIN)
+    if self.domain == '186.2.175.5':
+        self.base_link = 'http://' + self.domain    # IP → kein HTTPS
+    else:
+        self.base_link = 'https://' + self.domain
+    self._session = None
+
+--- Such-URLs (verschiedene Varianten) ---
+
+# Nur Pfad, urljoin() in run() (filmpalast):
+self.search_link = '/search/title/%s'
+
+# Volle URL mit base_link (kinokiste, kkiste, streamcloud):
+self.search_link = self.base_link + '/?do=search&subaction=search&titleonly=3&story=%s'
+
+# API-Endpoint mit zwei Platzhaltern (moflix):
+self.search_link = self.base_link + '/api/v1/search/%s?query=%s&limit=8'
+
+--- self.sources (9 von 13 Scrapers) ---
+
+Wenn der Scraper Hilfsmethoden hat die Quellen hinzufügen:
+
+    self.sources = []
+
+Wird gebraucht von: einschalten, hdfilme, kinoger, kinokiste,
+kkiste, megakino, moflix, netzkino, streamcloud.
+
+Ohne self.sources (lokale Variable in run()):
+filmpalast, serienstream, aniworld, filmpro.
+
+
+============================================================================
+5. run() — Quellen suchen
+============================================================================
+
+xShip ruft run() mit 5 Argumenten auf:
+    scraper.run(titles, year, season, episode, imdb)
+
+  titles    Liste von Titeln ['Der Pate', 'The Godfather']
+  year      Erscheinungsjahr (z.B. 1972)
+  season    Staffelnummer (0 = Film, 1+ = Serie)
+  episode   Episodennummer (0 = Film, 1+ = Serie)
+  imdb      IMDB-ID (z.B. 'tt0068646')
+
+Hinweis: hostDict steht in der Signatur, wird aber NICHT übergeben.
+Zwei Scraper (hdfilme, streamcloud) lassen hostDict in der Signatur
+sogar komplett weg: def run(self, titles, year, season=0, episode=0, imdb='')
+
+--- Scraper-Typen ---
+
+Reine Film-Scraper (brechen bei Serien ab):
+    if season > 0: return self.sources     # einschalten, netzkino
+
+Reine Serien-Scraper (brechen bei Filmen ab):
+    if not season or not episode:
+        return sources                      # serienstream, aniworld
+
+Gemischte Scraper (Film + Serie):
+    filmpalast, kinoger, kinokiste, kkiste, megakino,
+    hdfilme, moflix, filmpro, streamcloud
+
+--- Rückgabe ---
+
+Liste von Dictionaries:
+
+sources.append({
+    'source':     'Vidoza',      # Hoster-Name
+    'quality':    '720p',        # 'SD', '720p', '1080p', '4K'
+    'language':   'de',          # Sprache
+    'url':        'https://...', # Stream-URL
+    'direct':     True           # ResolveURL soll auflösen
+})
+
+Optionale Keys:
+    'prioHoster': prioHoster     # Von isBlockedHoster() (filmpalast, kinokiste etc.)
+    'jd_url':     'https://...'  # JDownloader-URL (kinoger)
+
+Rückgabe bei self.sources-Pattern:
+    return self.sources
+
+Rückgabe bei lokaler Variable:
+    return sources
+
+
+============================================================================
+6. TITEL-VERGLEICH
+============================================================================
+
+cleantitle.get() normalisiert Titel (Sonderzeichen raus, alles klein):
+
+Zwei Varianten werden verwendet:
+
+    # Als Liste (filmpalast, kinoger, filmpro, einschalten):
+    t = [cleantitle.get(i) for i in titles if i]
+
+    # Als Set (serienstream, aniworld, kinokiste, megakino, moflix, kkiste, hdfilme):
+    t = set(cleantitle.get(i) for i in titles if i)
+
+    # Manche nutzen set(titles) um Duplikate vorher zu entfernen:
+    t = set([cleantitle.get(i) for i in set(titles) if i])
+
+Vergleich:
+    if cleantitle.get(sName) in t:
+        # Treffer!
+
+
+============================================================================
+7. SUCHE — Verschiedene Methoden
+============================================================================
+
+--- Methode 1: URL mit Suchbegriff (Standard) ---
+
+    query = urljoin(self.base_link, self.search_link % title)
+    # oder:
+    query = self.search_link % title
+    # oder mit URL-Encoding:
+    query = self.search_link % quote_plus(title)
+
+--- Methode 2: POST-Parameter (megakino) ---
+
+    oRequest = cRequestHandler(self.base_link)
+    oRequest.addParameters('do', 'search')
+    oRequest.addParameters('subaction', 'search')
+    oRequest.addParameters('story', quote_plus(sSearchText))
+    sHtmlContent = oRequest.request()
+
+--- Methode 3: IMDB-ID direkt (filmpro, streamcloud) ---
+
+Manche Seiten bieten Lookup über IMDB-ID:
+
+    query = 'https://meinecloud.click/ddl/%s' % imdb     # filmpro
+    query = 'https://meinecloud.click/movie/%s' % imdb    # streamcloud
+
+--- Methode 4: Externe IDs via Trakt API (netzkino) ---
+
+    from resources.lib.utils import getExtIDS
+    aIDS = getExtIDS(imdb, 'movies')   # Holt IDs von Trakt
+
+
+============================================================================
+8. HTML LADEN UND CACHEN
+============================================================================
+
+--- Mit Cache ---
+
+    oRequest = cRequestHandler(sUrl)
+    oRequest.cacheTime = 60 * 60 * 24   # 24 Stunden
+    sHtmlContent = oRequest.request()
+
+--- Ohne Cache ---
+
+    oRequest = cRequestHandler(sUrl, caching=False)
+    sHtmlContent = oRequest.request()
+
+--- Mit Cache explizit aktiviert ---
+
+    oRequest = cRequestHandler(sUrl, caching=True)
+    sHtmlContent = oRequest.request()
+
+--- Fehler ignorieren (kinoger) ---
+
+    oRequest = cRequestHandler(sUrl, caching=False, ignoreErrors=True)
+    sHtmlContent = oRequest.request()
+
+--- Cache-Zeiten aus den echten Scrapers ---
+
+  filmpalast Suche:     7 Tage   (60 * 60 * 24 * 7)
+  filmpalast Detail:    1 Tag    (60 * 60 * 24)
+  serienstream Serien:  1 Tag    (60 * 60 * 24)
+  serienstream Staffel: 1 Tag    (60 * 60 * 24)
+  serienstream Episode: 4 Std    (60 * 60 * 4)
+  serienstream Hoster:  1 Std    (60 * 60)
+
+
+============================================================================
+9. HTML PARSEN — Zwei Methoden
+============================================================================
+
+--- Methode 1: cParser (Regex) ---
+
+Genutzt von: serienstream, aniworld, kinokiste, hdfilme, einschalten,
+             filmpro, kinoger, kkiste, megakino, streamcloud
+
+Mehrere Ergebnisse:
+    pattern = r'href="([^"]+)"[^>]*>([^<]+)'
+    isMatch, aResult = cParser.parse(sHtmlContent, pattern)
+    if isMatch:
+        for sUrl, sName in aResult:
+            ...
+
+Einzelnes Ergebnis:
+    isMatch, sResult = cParser.parseSingleResult(sHtmlContent, pattern)
+
+Regex-Kurzreferenz:
+  ([^"]+)     Alles bis zum nächsten "
+  ([^<]+)     Alles bis zum nächsten <
+  (\d+)       Ziffern
+  .*?         Beliebig (minimal)
+  [^>]*       Alles außer >
+  \s+         Whitespace
+
+--- Methode 2: dom_parser ---
+
+Genutzt von: filmpalast, kinoger, einschalten, filmpro, kkiste,
+             megakino, moflix, netzkino, streamcloud
+
+Elemente finden:
+    r = dom_parser.parse_dom(sHtmlContent, 'article')
+    r = dom_parser.parse_dom(r, 'a', attrs={'class': 'rb'}, req='href')
+
+Ergebnis ist eine Liste von DomMatch-Objekten:
+    for item in r:
+        url = item.attrs['href']    # Attribut
+        name = item.content         # Inhalt
+
+Verschachtelte Suche:
+    rows = dom_parser.parse_dom(html, 'ul', attrs={'class': 'currentStreamLinks'})
+    for row in rows:
+        hostnames = dom_parser.parse_dom(row, 'p', attrs={'class': 'hostName'})
+        links = dom_parser.parse_dom(row, 'a')
+
+--- Methode 3: JSON API ---
+
+Genutzt von: moflix, netzkino, einschalten, kinoger
+
+    import json
+    jResult = json.loads(sHtmlContent)
+    # Dann normal über jResult['key'] zugreifen
+
+
+============================================================================
+10. HOSTER FILTERN — Zwei Ansätze
+============================================================================
+
+--- Ansatz 1: isBlockedHoster() ---
+
+Wenn du die echte Hoster-URL hast (filmpalast, kinokiste, kkiste,
+megakino, einschalten, hdfilme, moflix, filmpro, streamcloud):
+
+    isBlocked, sDomain, sUrl, prioHoster = isBlockedHoster(link)
+    if isBlocked: continue
+
+Was die Funktion macht:
+  1. Folgt HTTP-Redirects (HEAD-Request)
+  2. Prüft gegen Blockliste (hosts.filter + permanente Liste)
+  3. Prüft ob ResolveURL den Hoster unterstützt
+  4. Löst die URL über ResolveURL auf
+  5. Gibt Hoster-Priorität zurück (niedriger = besser, 100 = Standard)
+
+Nur Blockliste prüfen, NICHT auflösen (isResolve=False):
+    isBlocked, sDomain, sUrl, prioHoster = isBlockedHoster(link, isResolve=False)
+
+--- Ansatz 2: getHostDict() ---
+
+Wenn du nur den Provider-NAMEN hast, keine URL
+(serienstream, aniworld — URL kommt erst in resolve()):
+
+    hostblockDict = getHostDict()
+    for play_url, provider_name, lang_id in aResult:
+        if any(h and h.lower() in provider_name.lower() for h in hostblockDict):
+            continue
+        sources.append({...})
+
+
+============================================================================
+11. QUALITÄT ERKENNEN
+============================================================================
+
+--- source_utils.get_release_quality() (filmpalast) ---
+
+    from scrapers.modules import source_utils
+    quality_text = dom_parser.parse_dom(html, 'span',
+                   attrs={'id': 'release_text'})[0].content
+    quality, info = source_utils.get_release_quality(quality_text)
+    # quality = '720p', '1080p', 'SD' etc.
+
+--- Manuell aus HTML (kinokiste, megakino) ---
+
+    isMatch, sQuality = cParser.parseSingleResult(sDummy, r'quality">([^<]+)')
+
+--- Fest vorgegeben (serienstream, aniworld) ---
+
+    'quality': '720p'
+
+
+============================================================================
+12. resolve() — URL auflösen
+============================================================================
+
+--- Einfach (die meisten Scraper) ---
+
+    def resolve(self, url):
+        try:
+            return url
+        except:
+            return
+
+--- Mit Login-Session (serienstream, aniworld) ---
+
+    def resolve(self, url):
+        try:
+            # Compound-URL aufteilen
+            parts = url.split('|||')
+            play_url = parts[0]
+            referer = parts[1] if len(parts) > 1 else self.base_link
+            full_play_url = (play_url if play_url.startswith('http')
+                             else self.base_link + play_url)
+
+            # Redirect folgen, bei abgelaufener Session neu einloggen
+            for attempt in range(2):
+                session = self._get_session(referer)
+                r = session.get(full_play_url, timeout=5)
+                sUrl = r.url
+                if self.domain in urlparse(sUrl).hostname:
+                    self._session = None   # Session abgelaufen
+                    continue
+                break
+            else:
+                return None
+
+            # VOE-Domain normalisieren
+            hostname = urlparse(sUrl).hostname
+            if hostname and 'voe' in hostname.lower():
+                isBlocked, sDomain, sCleanUrl, prioHoster = isBlockedHoster(
+                    sUrl, isResolve=False)
+                if isBlocked:
+                    sUrl = sUrl.replace(hostname, 'voe.sx')
+
+            # Über ResolveURL auflösen
+            try:
+                import resolveurl
+                hmf = resolveurl.HostedMediaFile(
+                    url=sUrl, include_disabled=True, include_universal=False)
+                if hmf.valid_url():
+                    resolved = hmf.resolve()
+                    if resolved: return resolved
+            except: pass
+
+            return sUrl
+        except:
+            return None
+
+
+============================================================================
+13. _get_session() — Login-Session
+============================================================================
+
+Für Seiten die Login brauchen (serienstream, aniworld):
+
+    def _get_session(self, referer):
+        if self._session is not None:
+            self._session.headers.update({'Referer': referer})
+            return self._session
+
+        import requests as req
+        req.packages.urllib3.disable_warnings()
+
+        session = req.Session()
+        session.headers.update({
+            'User-Agent': cRequestHandler.RandomUA(),
+            'Referer': referer,
+            'Upgrade-Insecure-Requests': '1'
+        })
+        session.verify = False
+
+        session.post(self.base_link + '/login', data={
+            'email': getSetting(SITE_IDENTIFIER + '.user'),
+            'password': getSetting(SITE_IDENTIFIER + '.pass')
+        }, timeout=5)
+
+        self._session = session
+        return session
+
+
+============================================================================
+14. REFERER ANHÄNGEN
+============================================================================
+
+$$ Syntax (ResolveURL-Konvention, genutzt von filmpalast):
+
+    if 'filemoon' in hoster or 'vidhide' in hoster or 'swiftload' in hoster:
+        link = link + '$$https://filmpalast.to/'
+
+Compound-URL ||| (genutzt von serienstream, aniworld):
+
+    compound_url = play_url + '|||' + ep_full_url
+    # Wird in resolve() wieder aufgeteilt
+
+
+============================================================================
+15. PARALLELE VERARBEITUNG
+============================================================================
+
+filmpalast prüft das Jahr bei mehreren Ergebnissen parallel:
+
+    self.list = []
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(self.chk_year, i, year) for i in r]
+        concurrent.futures.wait(futures)
+    r = self.list
+
+    def chk_year(self, i, year):
+        try:
+            years = ('%s' % str(year), '%s' % str(int(year) + 1),
+                     '%s' % str(int(year) - 1), '0')
+            query = urljoin(self.base_link, i[0])
+            sHtmlContent = cRequestHandler(query).request()
+            found_year = re.search(r'licht:.*?(\d{4})', sHtmlContent).group(1)
+            if found_year in years:
+                self.list.append((query, i[1]))
+        except:
+            pass
+
+Hinweis: '0' ist Fallback falls kein Jahr auf der Seite gefunden wird.
+
+
+============================================================================
+16. HILFSMETHODE getStreams()
+============================================================================
+
+kinokiste nutzt eine separate Methode für die Hoster-Extraktion:
+
+    def run(self, titles, year, season=0, episode=0, imdb='', hostDict=None):
+        ...
+        for link in links:
+            self.getStreams(link, year, season, episode, hostDict)
+        return self.sources
+
+    def getStreams(self, data, year, season, episode, hostDict):
+        sHtmlContent = cRequestHandler(data[0]).request()
+        ...
+        for i in aResult:
+            isBlocked, hoster, url, prioHoster = isBlockedHoster(sUrl)
+            if isBlocked: continue
+            self.sources.append({...})
+
+Vorteil: Kann für jedes Suchergebnis separat aufgerufen werden.
+Wichtig: Nutzt self.sources statt lokaler Variable.
+
+
+============================================================================
+17. DATEI-ABLAGE
+============================================================================
+
+    plugin.video.xship/
+    └── scrapers/
+        └── scrapers_source/
+            └── de/
+                ├── __init__.py         ← Scannt automatisch alle .py
+                ├── filmpalast.py
+                ├── serienstream.py
+                └── dein_scraper.py     ← Einfach ablegen
+
+Keine Registrierung nötig. Voraussetzungen:
+  1. Dateiname = SITE_IDENTIFIER
+  2. Klasse heißt "source"
+  3. run() und resolve() vorhanden
+
+
+============================================================================
+18. SETTINGS
+============================================================================
+
+Domain-Fallback kommt aus dem Python-Code, NICHT aus settings.xml:
+    getSetting('provider.beispiel.domain', 'beispiel.to')
+
+--- Pflicht-Settings (settings.xml) ---
+
+    <setting id="provider.beispielseite"
+             type="bool"
+             label="BEISPIELSEITE   |   [B][COLOR blue]Filme &amp; Serien[/COLOR][/B]"
+             default="true"/>
+
+    <setting id="provider.beispielseite.domain"
+             type="text"
+             label="[B][COLOR red]PluginError oder Domain nicht erreichbar[/COLOR][/B]"
+             default=""
+             visible="eq(1,false)"/>
+
+    <setting id="provider.beispielseite.check"
+             type="bool" label="Check" default="true" visible="false"/>
+
+--- Für Login-Seiten ---
+
+    <setting id="beispielseite.user" type="text" label="Email" default=""/>
+    <setting id="beispielseite.pass" type="text" option="hidden"
+             label="Password" default=""/>
+
+Label-Format für Seiten-Typ:
+  Filme & Serien:  [B][COLOR blue]Filme &amp; Serien[/COLOR][/B]
+  Nur Serien:      [B][COLOR green]Serien[/COLOR][/B]
+
+
+============================================================================
+19. ABLAUF
+============================================================================
+
+--- Film ---
+  xShip → TMDB → scraper.run(['Der Pate', 'The Godfather'], 1972, 0, 0, 'tt0068646')
+  → Scraper sucht → gibt [{source, quality, url}] zurück
+  → User wählt Hoster → scraper.resolve(url) → Wiedergabe
+
+--- Serie ---
+  xShip → TMDB → scraper.run(['Breaking Bad'], 2008, 3, 5, 'tt0903747')
+  → Scraper sucht Serie → Staffel 3 → Episode 5 → Hoster
+  → User wählt Hoster → scraper.resolve(url) → Wiedergabe
+
+
+============================================================================
+20. HÄUFIGE FEHLER
+============================================================================
+
+1. Scraper nicht gefunden
+   → Klasse ≠ "source", SITE_IDENTIFIER ≠ Dateiname, falscher Ordner
+
+2. Keine Quellen
+   → Pattern stimmt nicht, log_utils.log() nutzen
+
+3. Stream lädt nicht
+   → Referer fehlt ($$ oder |||), resolve() gibt None zurück
+
+4. Scraper blockiert andere
+   → run() nicht in try/except, "return sources" fehlt im except
+
+5. Alte Ergebnisse
+   → Cache-Zeit zu lang für Hoster-Links
+
+6. Falsche Filme
+   → cleantitle.get() nutzen, Jahr prüfen
+
+7. Login funktioniert nicht
+   → Session-Retry einbauen, Cookies prüfen
+
+
+============================================================================
+21. DEBUGGING
+============================================================================
+
+    from resources.lib import log_utils
+
+    log_utils.log('Text', log_utils.LOGDEBUG)      # Detail
+    log_utils.log('Text', log_utils.LOGINFO)        # Normal
+    log_utils.log('Text', log_utils.LOGWARNING)     # Warnung
+    log_utils.log('Text', log_utils.LOGERROR)       # Fehler
+
+HTML inspizieren:
+    log_utils.log('HTML: %s' % sHtmlContent[:500], log_utils.LOGDEBUG)
+
+Kodi Log: Settings → System → Logging → kodi.log
