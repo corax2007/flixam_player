@@ -1020,7 +1020,10 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _search,
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _search();
+                },
                 icon: const Icon(Icons.search, size: 16),
                 label: const Text('Suchen'),
               ),
@@ -1050,12 +1053,18 @@ class _HomePageState extends State<HomePage> {
             ),
             const Spacer(),
             TextButton.icon(
-              onPressed: _toggleProviderNew,
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _toggleProviderNew();
+              },
               icon: const Icon(Icons.new_releases, size: 15),
               label: const Text('Neu bei Anbietern'),
             ),
             TextButton.icon(
-              onPressed: _toggleNewSeries,
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _toggleNewSeries();
+              },
               icon: const Icon(Icons.tv_outlined, size: 15),
               label: const Text('Neue Serien'),
             ),
@@ -1067,6 +1076,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   int settingsTab = 0;
+  final ValueNotifier<int> settingsRevision = ValueNotifier(0);
   final TextEditingController tmdbKeyCtrl = TextEditingController();
 
   Future<void> _showSettings() async {
@@ -1141,7 +1151,13 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          CupertinoSwitch(value: value, onChanged: onChanged),
+          CupertinoSwitch(
+            value: value,
+            onChanged: (v) async {
+              await onChanged(v);
+              settingsRevision.value++;
+            },
+          ),
         ],
       ),
     );
@@ -1184,6 +1200,7 @@ class _HomePageState extends State<HomePage> {
                         onTap: () async {
                           setState(() => appSettings.layout = i);
                           await appSettings.save();
+                          settingsRevision.value++;
                         },
                         child: _layoutPreview(i,
                             selected: appSettings.layout == i),
@@ -1205,6 +1222,7 @@ class _HomePageState extends State<HomePage> {
                           setState(() => appSettings.design = i);
                           await appSettings.save();
                           widget.onDesignChanged?.call(i);
+                          settingsRevision.value++;
                         },
                         child: _designPreview(flixamDesigns[i],
                             selected: appSettings.design == i),
@@ -1298,6 +1316,7 @@ class _HomePageState extends State<HomePage> {
                           appSettings.onlyGerman = mode == 1;
                         });
                         await appSettings.save();
+                        settingsRevision.value++;
                       },
                     ),
                 ],
@@ -1397,6 +1416,7 @@ class _HomePageState extends State<HomePage> {
                       });
                       await appSettings.save();
                       await _loadHome();
+                      settingsRevision.value++;
                     },
                     child: const Text('Speichern'),
                   ),
@@ -1499,7 +1519,9 @@ class _HomePageState extends State<HomePage> {
     final tabNames = [
       'Allgemein', 'Anbieter', 'Player', 'Netzwerk', 'Cache', 'Erweitert'
     ];
-    return Scaffold(
+    return ValueListenableBuilder<int>(
+      valueListenable: settingsRevision,
+      builder: (context, revision, _) => Scaffold(
       backgroundColor: bg(context),
       body: Row(
         children: [
@@ -1558,8 +1580,10 @@ class _HomePageState extends State<HomePage> {
                         ChoiceChip(
                           label: Text(tabNames[i]),
                           selected: settingsTab == i,
-                          onSelected: (_) =>
-                              setState(() => settingsTab = i),
+                          onSelected: (_) {
+                            setState(() => settingsTab = i);
+                            settingsRevision.value++;
+                          },
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -1582,6 +1606,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
