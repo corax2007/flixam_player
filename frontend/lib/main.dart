@@ -992,9 +992,6 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Suche & Filter',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
         TextField(
           controller: searchCtrl,
           decoration: const InputDecoration(
@@ -1069,290 +1066,524 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  int settingsTab = 0;
+  final TextEditingController tmdbKeyCtrl = TextEditingController();
+
   Future<void> _showSettings() async {
-    final confirmed = await showCupertinoModalPopup<bool>(
-      context: context,
-      builder: (ctx) {
-        return CupertinoApp(
-          theme: const CupertinoThemeData(brightness: Brightness.dark),
-          localizationsDelegates: const [
-            DefaultMaterialLocalizations.delegate,
-            DefaultCupertinoLocalizations.delegate,
-          ],
-          locale: const Locale('en'),
-          supportedLocales: const [Locale('en')],
-          home: CupertinoPageScaffold(
-            backgroundColor: bg(context),
-            navigationBar: CupertinoNavigationBar(
-              backgroundColor: bg(context),
-              middle: const Text('Einstellungen'),
-              leading: CupertinoNavigationBarBackButton(),
-              trailing: SizedBox(
-                width: 44,
-                height: 44,
+    try {
+      final f = File('${Platform.environment['HOME'] ?? '.'}/.flixam_tmdb_key');
+      if (f.existsSync()) tmdbKeyCtrl.text = f.readAsStringSync().trim();
+    } catch (_) {}
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _buildSettingsScreen(),
+      ),
+    );
+  }
+
+  Widget _settingsRail() {
+    final items = <Map<String, dynamic>>[
+      {'icon': Icons.home_outlined, 'label': 'Home', 'tap': _goHome},
+      {'icon': Icons.search, 'label': 'Suche', 'tap': _search},
+      {'icon': Icons.movie_outlined, 'label': 'Filme', 'tap': _browseRoot},
+      {'icon': Icons.favorite_border, 'label': 'Favoriten', 'tap': () {
+        setState(() {
+          showFavorites = !showFavorites;
+          showHome = false;
+          heroItem = null;
+        });
+      }},
+      {'icon': Icons.settings_outlined, 'label': 'Einstellungen', 'tap': null},
+    ];
+    return SizedBox(
+      width: 68,
+      child: Container(
+        color: surf(context),
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            for (final it in items)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: IconButton(
-                  icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 24),
-                  onPressed: () => Navigator.of(ctx).pop(),
+                  tooltip: it['label'] as String,
+                  icon: Icon(it['icon'] as IconData,
+                      color: it['tap'] == null ? accent(context) : Colors.white70),
+                  onPressed: it['tap'] == null
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          (it['tap'] as VoidCallback).call();
+                        },
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsSwitch(String label, bool value, Future<void> Function(bool) onChanged,
+      {String? hint}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 14)),
+                if (hint != null)
+                  Text(hint,
+                      style: const TextStyle(fontSize: 10, color: Colors.white54)),
+              ],
             ),
-            child: CallbackShortcuts(
-              bindings: {
-                SingleActivator(LogicalKeyboardKey.escape): () {
-                  Navigator.of(ctx).maybePop();
-                },
-              },
-              child: SafeArea(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                      _settingsFilters(),
-                      const Text('Layout',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          for (var i = 0; i < flixamLayouts.length; i++) ...[
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  setState(() => appSettings.layout = i);
-                                  await appSettings.save();
-                                  setState(() {});
-                                },
-                                child: _layoutPreview(i, selected: appSettings.layout == i),
-                              ),
-                            ),
-                            if (i < flixamLayouts.length - 1) const SizedBox(width: 8),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Design',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          for (var i = 0; i < flixamDesigns.length; i++) ...[
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  setState(() => appSettings.design = i);
-                                  await appSettings.save();
-                                  widget.onDesignChanged?.call(i);
-                                },
-                                child: _designPreview(
-                                  flixamDesigns[i],
-                                  selected: appSettings.design == i,
-                                ),
-                              ),
-                            ),
-                            if (i < flixamDesigns.length - 1)
-                              const SizedBox(width: 8),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (!Platform.isAndroid) ...[
-                        const Text('VPN-Tunnel aktivieren (wireproxy)',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 8),
-                        CupertinoSwitch(
-                          value: vpnEnabled,
-                          onChanged: (v) async => _toggleVpn(v),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('wireproxy läuft: ${File('/home/joerg/flixam_player/vpn/wireproxy').existsSync() ? 'ja' : 'nein'}'),
-                        if (!hasVpnConfig)
-                          const Text(
-                            'wg0.conf nicht mit echten Zugangsdaten befüllt.',
-                            style: TextStyle(color: Colors.orange),
-                          ),
-                        const SizedBox(height: 12),
-                        CupertinoButton(
-                          onPressed: () => _importConf(),
-                          child: const Text('WireGuard-Config (.conf) importieren'),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      if (!Platform.isAndroid) ...[
-                        CupertinoTextField(
-                          controller: tmdbCtrl,
-                          decoration: const BoxDecoration(),
-                          placeholder: 'TMDB API Key',
-                        ),
-                        const SizedBox(height: 8),
-                        CupertinoButton(
-                          onPressed: () async {
-                            await _saveTmdb(tmdbCtrl.text);
-                          },
-                          child: const Text('TMDB API Key speichern'),
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      const Text('Backend-Adresse (Fire TV / LAN)',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      CupertinoTextField(
-                        controller: backendCtrl,
-                        decoration: const BoxDecoration(),
-                        placeholder: 'http://192.168.1.10:8000',
-                      ),
-                      const SizedBox(height: 8),
-                      CupertinoButton(
-                        onPressed: () async {
-                          final url = backendCtrl.text.trim().isEmpty
-                              ? AppSettings.defaultBackendUrl
-                              : backendCtrl.text.trim();
-                          setState(() {
-                            appSettings.backendUrl = url;
-                            api.baseUrl = url;
-                          });
+          ),
+          CupertinoSwitch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsCard({required String title, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surf(context),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsTabContent() {
+    switch (settingsTab) {
+      case 0:
+        return Column(
+          children: [
+            _settingsCard(title: 'Suche & Filter', child: _settingsFilters()),
+            _settingsCard(
+              title: 'Layout',
+              child: Row(
+                children: [
+                  for (var i = 0; i < flixamLayouts.length; i++) ...[
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          setState(() => appSettings.layout = i);
                           await appSettings.save();
-                          await _loadHome();
                         },
-                        child: const Text('Backend-Adresse speichern'),
+                        child: _layoutPreview(i,
+                            selected: appSettings.layout == i),
                       ),
-                      const SizedBox(height: 16),
-                      const Text('HLS-Cache', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const SizedBox(width: 130, child: Text('Puffer (Sek.)')),
-                          SizedBox(width: 90, child: CupertinoTextField(controller: cacheCtrl, keyboardType: TextInputType.number)),
-                        ],
+                    ),
+                    if (i < flixamLayouts.length - 1) const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            ),
+            _settingsCard(
+              title: 'Design',
+              child: Row(
+                children: [
+                  for (var i = 0; i < flixamDesigns.length; i++) ...[
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          setState(() => appSettings.design = i);
+                          await appSettings.save();
+                          widget.onDesignChanged?.call(i);
+                        },
+                        child: _designPreview(flixamDesigns[i],
+                            selected: appSettings.design == i),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const SizedBox(width: 130, child: Text('Max. Cache (MB)')),
-                          SizedBox(width: 90, child: CupertinoTextField(controller: demuxMaxCtrl, keyboardType: TextInputType.number)),
-                        ],
+                    ),
+                    if (i < flixamDesigns.length - 1) const SizedBox(width: 8),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        );
+      case 1:
+        return Column(
+          children: [
+            _settingsCard(
+              title: 'Quellen',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (Platform.isAndroid)
+                    _settingsSwitch(
+                      'Nur verfügbare Titel zeigen',
+                      appSettings.onlyAvailable,
+                      (v) async {
+                        setState(() => appSettings.onlyAvailable = v);
+                        await appSettings.save();
+                        await _loadHome();
+                      },
+                    ),
+                  Text('Aktives Addon: ${addon == 'xstream' ? 'xStream' : 'xShip'}',
+                      style: const TextStyle(fontSize: 13)),
+                  const SizedBox(height: 10),
+                  Text('Eigene Quellen: ${CustomSources.path}',
+                      style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                  TextButton(
+                    onPressed: () async {
+                      await CustomSources.instance.reload();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Eigene Quellen neu geladen')),
+                        );
+                      }
+                    },
+                    child: const Text('Eigene Quellen neu laden'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      case 2:
+        return Column(
+          children: [
+            _settingsCard(
+              title: 'Wiedergabe',
+              child: Column(
+                children: [
+                  _settingsSwitch(
+                    'Staffel ohne Pause abspielen',
+                    appSettings.autoPlaySeason,
+                    (v) async {
+                      setState(() => appSettings.autoPlaySeason = v);
+                      await appSettings.save();
+                    },
+                    hint: 'Folgen automatisch nacheinander',
+                  ),
+                  _settingsSwitch(
+                    'Hero-Details beim Browse',
+                    appSettings.heroInBrowse,
+                    (v) async {
+                      setState(() => appSettings.heroInBrowse = v);
+                      await appSettings.save();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            _settingsCard(
+              title: 'Sprache der Titel',
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  for (final mode in [0, 1, 2])
+                    ChoiceChip(
+                      label: Text(['Alle', 'Nur Deutsch', 'Nur Englisch'][mode]),
+                      selected: appSettings.languageMode == mode,
+                      onSelected: (_) async {
+                        setState(() {
+                          appSettings.languageMode = mode;
+                          appSettings.onlyGerman = mode == 1;
+                        });
+                        await appSettings.save();
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      case 3:
+        return Column(
+          children: [
+            _settingsCard(
+              title: 'VPN-Tunnel aktivieren (WireProxy)',
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.circle, size: 9,
+                          color: hasVpnConfig ? Colors.green : Colors.orange),
+                      const SizedBox(width: 6),
+                      const Text('Wireproxy läuft: ja',
+                          style: TextStyle(fontSize: 12)),
+                      const Spacer(),
+                      CupertinoSwitch(value: vpnEnabled,
+                          onChanged: (v) async => _toggleVpn(v)),
+                    ],
+                  ),
+                  if (!hasVpnConfig)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'wg0.conf nicht mit echten Zugangsdaten befüllt.',
+                        style: TextStyle(color: Colors.orange, fontSize: 11),
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const SizedBox(width: 130, child: Text('Burst (MB)')),
-                          SizedBox(width: 90, child: CupertinoTextField(controller: demuxBurstCtrl, keyboardType: TextInputType.number)),
-                        ],
+                    ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _importConf,
+                      icon: const Icon(Icons.upload_file, size: 16),
+                      label: const Text('WireGuard-Config (.conf) importieren'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _settingsCard(
+              title: 'TMDB API Key',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: tmdbKeyCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'Key speichern',
+                        isDense: true,
                       ),
-                      const SizedBox(height: 10),
-                      CupertinoButton(
-                        onPressed: _saveCacheSettings,
-                        child: const Text('Cache-Einstellungen speichern'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final key = tmdbKeyCtrl.text.trim();
+                      try {
+                        await File('${Platform.environment['HOME'] ?? '.'}/.flixam_tmdb_key')
+                            .writeAsString(key);
+                        if (!api.useDirect) await _saveTmdb(key);
+                        TmdbService.instance.reload();
+                      } catch (_) {}
+                    },
+                    child: const Text('Speichern'),
+                  ),
+                ],
+              ),
+            ),
+            _settingsCard(
+              title: 'Backend-Adresse (Fire TV / LAN)',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: backendCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'http://127.0.0.1:8000',
+                        isDense: true,
                       ),
-                      const SizedBox(height: 12),
-                      const Text('Sprache der Titel',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          for (final mode in [0, 1, 2])
-                            ChoiceChip(
-                              label: Text(
-                                ['Alle', 'Nur Deutsch', 'Nur Englisch'][mode],
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              selected: appSettings.languageMode == mode,
-                              onSelected: (_) async {
-                                setState(() {
-                                  appSettings.languageMode = mode;
-                                  appSettings.onlyGerman = mode == 1;
-                                });
-                                await appSettings.save();
-                              },
-                            ),
-                        ],
-                      ),
-                      const Text(
-                        'Filter nach Originalsprache - gilt überall für Filme und Serien',
-                        style: TextStyle(fontSize: 10, color: Colors.white54),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Staffel ohne Pause abspielen'),
-                                Text(
-                                  'Folgen automatisch nacheinander',
-                                  style: TextStyle(fontSize: 10, color: Colors.white54),
-                                ),
-                              ],
-                            ),
-                          ),
-                          CupertinoSwitch(
-                            value: appSettings.autoPlaySeason,
-                            onChanged: (v) async {
-                              setState(() => appSettings.autoPlaySeason = v);
-                              await appSettings.save();
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Expanded(child: Text('Hero-Details beim Browse')),
-                          CupertinoSwitch(
-                            value: appSettings.heroInBrowse,
-                            onChanged: (v) async {
-                              setState(() => appSettings.heroInBrowse = v);
-                              await appSettings.save();
-                            },
-                          ),
-                        ],
-                      ),
-                      if (Platform.isAndroid)
-                        Row(
-                          children: [
-                            const Expanded(child: Text('Nur verfügbare Titel zeigen')),
-                            CupertinoSwitch(
-                              value: appSettings.onlyAvailable,
-                              onChanged: (v) async {
-                                setState(() => appSettings.onlyAvailable = v);
-                                await appSettings.save();
-                                await _loadHome();
-                              },
-                            ),
-                          ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final url = backendCtrl.text.trim().isEmpty
+                          ? AppSettings.defaultBackendUrl
+                          : backendCtrl.text.trim();
+                      setState(() {
+                        appSettings.backendUrl = url;
+                        api.baseUrl = url;
+                      });
+                      await appSettings.save();
+                      await _loadHome();
+                    },
+                    child: const Text('Speichern'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      case 4:
+        return Column(
+          children: [
+            _settingsCard(
+              title: 'HLS-Cache',
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const SizedBox(width: 140, child: Text('Puffer (Sek.)')),
+                      SizedBox(
+                        width: 100,
+                        child: TextField(
+                          controller: cacheCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(isDense: true),
                         ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Eigene Quellen: ${CustomSources.path}',
-                        style: const TextStyle(fontSize: 10, color: Colors.white54),
                       ),
-                      CupertinoButton(
-                        onPressed: () async {
-                          await CustomSources.instance.reload();
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Eigene Quellen neu geladen')),
-                            );
-                          }
-                        },
-                        child: const Text('Eigene Quellen neu laden'),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const SizedBox(width: 140, child: Text('Max. Cache (MB)')),
+                      SizedBox(
+                        width: 100,
+                        child: TextField(
+                          controller: demuxMaxCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(isDense: true),
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const SizedBox(width: 140, child: Text('Burst (MB)')),
+                      SizedBox(
+                        width: 100,
+                        child: TextField(
+                          controller: demuxBurstCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(isDense: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ElevatedButton(
+                      onPressed: _saveCacheSettings,
+                      child: const Text('Cache-Einstellungen speichern'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      default:
+        return _settingsCard(
+          title: 'Erweitert',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Eigene Quellen',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Text(CustomSources.path,
+                  style: const TextStyle(fontSize: 11, color: Colors.white54)),
+              TextButton(
+                onPressed: () async {
+                  await CustomSources.instance.reload();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Eigene Quellen neu geladen')),
+                    );
+                  }
+                },
+                child: const Text('Eigene Quellen neu laden'),
+              ),
+            ],
+          ),
+        );
+    }
+  }
+
+  Widget _buildSettingsScreen() {
+    final d = designAt(appSettings.design);
+    final tabNames = [
+      'Allgemein', 'Anbieter', 'Player', 'Netzwerk', 'Cache', 'Erweitert'
+    ];
+    return Scaffold(
+      backgroundColor: bg(context),
+      body: Row(
+        children: [
+          _settingsRail(),
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  height: 60,
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  decoration: BoxDecoration(
+                    color: surf(context),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text('XStream',
+                          style: TextStyle(
+                              color: d.accent,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800)),
+                      Expanded(
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.settings_outlined,
+                                  size: 20, color: d.accent),
+                              const SizedBox(width: 8),
+                              const Text('Einstellungen',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Schließen',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 18),
+                      for (var i = 0; i < tabNames.length; i++) ...[
+                        ChoiceChip(
+                          label: Text(tabNames[i]),
+                          selected: settingsTab == i,
+                          onSelected: (_) =>
+                              setState(() => settingsTab = i),
+                        ),
+                        const SizedBox(width: 8),
                       ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 900),
+                        child: _settingsTabContent(),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
-    if (confirmed == true) {
-      // no-op
-    }
   }
 
   Future<void> _showItemMenuLongPress(Map<String, dynamic> item) =>
