@@ -268,6 +268,53 @@ class TmdbService {
     return out;
   }
 
+  /// Neueste Serien - nur Eigenproduktionen der grossen Dienste.
+  Future<List<Map<String, dynamic>>> newSeries({
+    bool originals = true,
+    int limit = 12,
+  }) async {
+    final networks = originals
+        ? const [
+            {'id': 2552, 'name': 'Apple TV+'},
+            {'id': 213, 'name': 'Netflix'},
+            {'id': 2739, 'name': 'Disney+'},
+            {'id': 1024, 'name': 'Prime Video'},
+            {'id': 49, 'name': 'HBO / Max'},
+          ]
+        : const [
+            {'id': null, 'name': 'Neu im Streaming'},
+          ];
+    final out = <Map<String, dynamic>>[];
+    for (final net in networks) {
+      final params = <String, dynamic>{
+        'sort_by': 'first_air_date.desc',
+        'page': 1,
+      };
+      if (net['id'] != null) {
+        params['with_networks'] = net['id'];
+      } else {
+        params['with_watch_providers'] = 8;
+        params['watch_region'] = 'DE';
+      }
+      final data = await _get('discover/tv', params) ?? {};
+      final items = <Map<String, dynamic>>[];
+      final seen = <String>{};
+      for (final r in (data['results'] as List?) ?? []) {
+        final it = await toItem(r, 'tv');
+        if (it == null) continue;
+        if ((it['poster_url']?.toString() ?? '').isEmpty) continue;
+        final year = int.tryParse(it['year']?.toString() ?? '') ?? 9999;
+        if (year > DateTime.now().year) continue;
+        if (seen.add(it['title'].toString())) items.add(it);
+        if (items.length >= limit) break;
+      }
+      if (items.isNotEmpty) {
+        out.add({'id': net['id'], 'name': net['name'], 'items': items});
+      }
+    }
+    return out;
+  }
+
   /// Alle neuesten Titel eines Anbieters (fuer das "mehr" der Uebersicht).
   Future<List<Map<String, dynamic>>> providerRecentItems(
     int id, {

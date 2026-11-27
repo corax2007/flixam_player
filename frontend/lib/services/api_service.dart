@@ -142,6 +142,18 @@ class ApiService {
     return (j['providers'] as List?) ?? [];
   }
 
+  Future<List<dynamic>> newSeries({bool originals = true}) async {
+    if (useDirect) {
+      return (await TmdbService.instance.newSeries(originals: originals))
+          .cast<dynamic>();
+    }
+    final r = await http.get(
+      Uri.parse('$baseUrl/tmdb/series/new?originals=$originals'),
+    ).timeout(const Duration(seconds: 180));
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return (j['groups'] as List?) ?? [];
+  }
+
   Future<List<dynamic>> providerRecentItems(int id, {int limit = 40}) async {
     if (useDirect) {
       return (await TmdbService.instance.providerRecentItems(id, limit: limit))

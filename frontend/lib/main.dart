@@ -103,6 +103,10 @@ class _HomePageState extends State<HomePage> {
   bool showSourceEpisodes = false;
   bool showProviderNew = false;
   bool providerNewLoading = false;
+  bool showNewSeries = false;
+  bool newSeriesOriginals = true;
+  bool newSeriesLoading = false;
+  List<dynamic> newSeriesGroups = [];
   List<dynamic> providerNewGroups = [];
   final Set<int> _expandedProviders = {};
   final Map<int, List<dynamic>> _providerMoreItems = {};
@@ -1362,6 +1366,125 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       setState(() => streamingProviders = list);
     } catch (_) {}
+  }
+
+  Future<void> _loadNewSeries({bool? originals}) async {
+    if (originals != null) newSeriesOriginals = originals;
+    setState(() => newSeriesLoading = true);
+    try {
+      final groups = await api.newSeries(originals: newSeriesOriginals);
+      if (mounted) setState(() => newSeriesGroups = groups);
+    } catch (_) {}
+    if (mounted) setState(() => newSeriesLoading = false);
+  }
+
+  Future<void> _toggleNewSeries() async {
+    if (showNewSeries) {
+      setState(() => showNewSeries = false);
+      return;
+    }
+    setState(() {
+      showNewSeries = true;
+      showProviderNew = false;
+      showFavorites = false;
+      showSourceEpisodes = false;
+      showHome = false;
+      heroItem = null;
+    });
+    if (newSeriesGroups.isEmpty) await _loadNewSeries();
+  }
+
+  List<Widget> _buildNewSeriesSlivers() {
+    final list = <Widget>[
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  newSeriesOriginals
+                      ? 'Neue Serien · Eigenproduktionen'
+                      : 'Neue Serien · alle',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              ActionChip(
+                label: Text(
+                    newSeriesOriginals ? 'Alle Serien' : 'Nur Originals'),
+                onPressed: () => _loadNewSeries(
+                    originals: !newSeriesOriginals),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() => showNewSeries = false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
+    if (newSeriesLoading) {
+      list.add(const SliverToBoxAdapter(
+        child: SizedBox(
+          height: 160,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ));
+      return list;
+    }
+    if (newSeriesGroups.isEmpty) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Keine neuen Serien gefunden.'),
+        ),
+      ));
+      return list;
+    }
+    for (final g in newSeriesGroups) {
+      final items = ((g['items'] as List?) ?? [])
+          .whereType<Map>()
+          .map((m) => m.cast<String, dynamic>())
+          .toList();
+      if (items.isEmpty) continue;
+      list.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: Row(
+            children: [
+              Icon(Icons.tv_outlined, size: 16, color: accent(context)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  g['name']?.toString() ?? 'Netzwerk',
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ));
+      list.add(SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 140,
+            childAspectRatio: 2 / 3,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (ctx, i) => _homeItemCard(items[i], autofocus: i == 0),
+            childCount: items.length,
+          ),
+        ),
+      ));
+    }
+    return list;
   }
 
   Future<void> _toggleProviderNew() async {
@@ -2713,10 +2836,12 @@ class _HomePageState extends State<HomePage> {
           _aetherNavItem(Icons.search, 'Suche',
               active: false, onTap: () => _search()),
           _aetherNavItem(Icons.movie_outlined, 'Filme',
-              active: !showHome && !showFavorites && !showProviderNew && !showSourceEpisodes,
+              active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showSourceEpisodes,
               onTap: _browseRoot),
           _aetherNavItem(Icons.new_releases, 'Neu bei Anbietern',
               active: showProviderNew, onTap: _toggleProviderNew),
+          _aetherNavItem(Icons.tv_outlined, 'Neue Serien',
+              active: showNewSeries, onTap: _toggleNewSeries),
           _aetherNavItem(Icons.favorite_border, 'Favoriten', active: showFavorites,
               onTap: () => setState(() {
                     showFavorites = !showFavorites;
@@ -3095,10 +3220,18 @@ class _HomePageState extends State<HomePage> {
                             : 'Neu bei Anbietern'),
                         onPressed: _toggleProviderNew,
                       ),
+                      const SizedBox(width: 6),
+                      ActionChip(
+                        avatar: Icon(Icons.tv_outlined,
+                            size: 14, color: accent(context)),
+                        label: const Text('Neue Serien'),
+                        onPressed: _toggleNewSeries,
+                      ),
                     ],
                   ),
                 ),
               ),
+              if (showNewSeries) ..._buildNewSeriesSlivers(),
               if (showProviderNew) ..._buildProviderNewSlivers(),
               if (showFavorites) ..._buildFavoriteSlivers(),
               if (showSourceEpisodes) ..._buildSourceEpisodeSlivers(),

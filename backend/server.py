@@ -891,6 +891,65 @@ def tmdb_providers():
     return {"providers": result}
 
 
+ORIGINAL_NETWORKS = [
+    {"id": 2552, "name": "Apple TV+"},
+    {"id": 213, "name": "Netflix"},
+    {"id": 2739, "name": "Disney+"},
+    {"id": 1024, "name": "Prime Video"},
+    {"id": 49, "name": "HBO / Max"},
+]
+
+
+@app.get("/tmdb/series/new")
+def tmdb_series_new(originals: bool = True, limit: int = 12):
+    """Neueste Serien - standardmaessig nur Eigenproduktionen der Dienste."""
+    cache_key = f"series|new|{originals}|{limit}"
+    if cache_key in _TMDB_CACHE:
+        return {"groups": _TMDB_CACHE[cache_key]}
+    from concurrent.futures import ThreadPoolExecutor
+
+    targets = ORIGINAL_NETWORKS if originals else [
+        {"id": None, "name": "Neu im Streaming"}
+    ]
+
+    def fetch(net):
+        params = {"sort_by": "first_air_date.desc", "page": 1}
+        if net["id"]:
+            params["with_networks"] = net["id"]
+        else:
+            params.update({
+                "with_watch_providers": 8,
+                "watch_region": "DE",
+            })
+        data = _tmdb_get("discover/tv", params) or {}
+        out = []
+        seen = set()
+        from datetime import date as _date
+        for r in (data.get("results") or []):
+            item = _tmdb_to_item(r, "tv")
+            if not item or not item.get("title"):
+                continue
+            if not item.get("poster_url"):
+                continue
+            try:
+                if int(item.get("year") or 9999) > _date.today().year:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            if item["title"] not in seen:
+                seen.add(item["title"])
+                out.append(item)
+        return {"id": net["id"], "name": net["name"], "items": out[:limit]}
+
+    groups = []
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        for group in pool.map(fetch, targets):
+            if group["items"]:
+                groups.append(group)
+    _TMDB_CACHE[cache_key] = groups
+    return {"groups": groups}
+
+
 @app.get("/tmdb/provider/recent")
 def tmdb_provider_recent(id: str = Query(""), limit: int = 40):
     """Alle neuesten Titel eines einzelnen Streaminganbieters."""
