@@ -48,6 +48,18 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> vavooProgramInfo(String title) async {
+    if (useDirect) return {};
+    try {
+      final r = await http.get(
+        Uri.parse('$baseUrl/vavoo/program/info?title=${Uri.encodeComponent(title)}'),
+      ).timeout(const Duration(seconds: 60));
+      return jsonDecode(r.body) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
   Future<Map<String, dynamic>> vavooEpg() async {
     if (useDirect) return {};
     try {

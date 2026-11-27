@@ -19,6 +19,8 @@ import 'services/gez_kino_service.dart';
 import 'services/trailer_service.dart';
 import 'services/recently_added_service.dart';
 import 'widgets/tv_focusable.dart';
+import 'widgets/live_tv/aether_widgets.dart';
+import 'models/live_tv_viewmodel.dart';
 import 'trailer_page.dart';
 import 'detail_page.dart';
 
@@ -107,6 +109,8 @@ class _HomePageState extends State<HomePage> {
   bool liveLoading = false;
   List<dynamic> liveChannels = [];
   Map<String, dynamic> liveEpg = {};
+  Map<String, dynamic> liveProgramInfo = {};
+  int selectedLiveIndex = 0;
   int liveCategory = 0;
   bool liveMultiSelect = false;
   final Set<String> liveSelected = {};
@@ -2219,6 +2223,28 @@ class _HomePageState extends State<HomePage> {
     }).toList();
   }
 
+  List<LiveChannelVm> _liveChannelVms() {
+    return _filteredLiveChannels().map((raw) {
+      final map = (raw as Map).cast<String, dynamic>();
+      final name = map['title']?.toString() ?? '';
+      return LiveChannelVm.fromRaw(
+        channel: map,
+        epg: (liveEpg[name] as Map?)?.cast<String, dynamic>(),
+        favorite: prefs.isFavoriteChannel(name),
+        category: liveCategories[_channelCategory(name)],
+      );
+    }).toList();
+  }
+
+  Future<void> _selectLiveChannel(int index, List<LiveChannelVm> vms) async {
+    if (index < 0 || index >= vms.length) return;
+    setState(() => selectedLiveIndex = index);
+    final program = vms[index].program;
+    if (program.isEmpty || liveProgramInfo.containsKey(program)) return;
+    final info = await api.vavooProgramInfo(program);
+    if (mounted) setState(() => liveProgramInfo[program] = info);
+  }
+
   List<Widget> _buildLiveTvSlivers() {
     final list = <Widget>[
       SliverToBoxAdapter(
@@ -2376,114 +2402,101 @@ class _HomePageState extends State<HomePage> {
       ));
       return list;
     }
-    list.add(SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 180,
-          childAspectRatio: 3 / 1.2,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
+    final vms = _liveChannelVms();
+    if (vms.isEmpty) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('Keine Sender gefunden.'),
         ),
-        delegate: SliverChildBuilderDelegate(
-          (ctx, i) {
-            final title = channels[i]['title']?.toString() ?? '';
-            return InkWell(
-              onTap: () {
-                if (liveMultiSelect) {
-                  setState(() {
-                    if (!liveSelected.remove(title)) liveSelected.add(title);
-                  });
-                } else {
-                  _play(channels[i]['url']?.toString() ?? '', title);
-                }
-              },
-              onLongPress: () async {
-                await prefs.toggleHiddenChannel(title);
-                if (mounted) setState(() {});
-              },
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: surf(context),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white24),
-                ),
-                child: Row(
-                  children: [
-                    if (liveMultiSelect)
-                      Icon(
-                        liveSelected.contains(title)
-                            ? Icons.check_box
-                            : Icons.check_box_outline_blank,
-                        size: 16,
-                        color: liveSelected.contains(title)
-                            ? accent(context)
-                            : Colors.white54,
-                      ),
-                    if (!liveMultiSelect)
-                    Icon(
-                      prefs.isChannelHidden(title)
-                          ? Icons.visibility_off
-                          : Icons.live_tv,
-                      size: 18,
-                      color: prefs.isChannelHidden(title)
-                          ? Colors.redAccent
-                          : accent(context),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w600),
-                          ),
-                          if (liveEpg[title] != null)
-                            Text(
-                              'Jetzt: ${liveEpg[title]['title']} · '
-                              '${liveEpg[title]['start']}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 9,
-                                color: accent(context),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: prefs.isFavoriteChannel(title)
-                          ? 'Aus Favoriten entfernen'
-                          : 'Als Favorit merken',
-                      icon: Icon(
-                        prefs.isFavoriteChannel(title)
-                            ? Icons.star
-                            : Icons.star_border,
-                        size: 16,
-                        color: prefs.isFavoriteChannel(title)
-                            ? Colors.amber
-                            : Colors.white54,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () async {
-                        await prefs.toggleFavoriteChannel(title);
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
+      ));
+      return list;
+    }
+    if (selectedLiveIndex >= vms.length) selectedLiveIndex = vms.length - 1;
+    final currentVm = vms[selectedLiveIndex];
+    final inspector = InspectorVm.fromRaw(
+      channel: currentVm,
+      info: (liveProgramInfo[currentVm.program] as Map?)
+          ?.cast<String, dynamic>(),
+    );
+    list.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent &&
+                (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                    event.logicalKey == LogicalKeyboardKey.arrowUp)) {
+              final delta = event.logicalKey == LogicalKeyboardKey.arrowDown
+                  ? 1
+                  : -1;
+              _selectLiveChannel(
+                (selectedLiveIndex + delta).clamp(0, vms.length - 1),
+                vms,
+              );
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
           },
-          childCount: channels.length,
+          child: SizedBox(
+            height: 560,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 45,
+                  child: ListView.builder(
+                    itemCount: vms.length,
+                    itemBuilder: (ctx, i) {
+                      final vm = vms[i];
+                      return ChannelListTile(
+                        channel: vm,
+                        selected: i == selectedLiveIndex,
+                        onTap: () {
+                          if (liveMultiSelect) {
+                            setState(() {
+                              if (!liveSelected.remove(vm.name)) {
+                                liveSelected.add(vm.name);
+                              }
+                            });
+                          } else {
+                            _selectLiveChannel(i, vms);
+                          }
+                        },
+                        onDoubleTap: () =>
+                            _play(vm.url, vm.name),
+                        onFavorite: () async {
+                          await prefs.toggleFavoriteChannel(vm.name);
+                          if (mounted) setState(() {});
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 400,
+                  child: Card(
+                    color: AetherColors.card.withValues(alpha: 0.82),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: const BorderRadius.all(
+                        AetherColors.cardRadius,
+                      ),
+                      side: const BorderSide(color: AetherColors.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: EpgInspectorPanel(
+                        vm: inspector,
+                        onPlay: () => _play(currentVm.url, currentVm.name),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     ));

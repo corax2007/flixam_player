@@ -590,6 +590,7 @@ def _epg_load() -> dict:
             root = ET.fromstring(xml_data)
             names = {}
             cid_to_name = {}
+            cid_to_icon = {}
             for ch in root.findall("channel"):
                 cid = str(ch.get("id") or "")
                 display = []
@@ -600,6 +601,9 @@ def _epg_load() -> dict:
                 if not display:
                     continue
                 cid_to_name[cid] = display[0]
+                icon_el = ch.find("icon")
+                if icon_el is not None:
+                    cid_to_icon[cid] = str(icon_el.get("src") or "")
                 for name in display:
                     key = _epg_norm(name)
                     if key:
@@ -617,7 +621,7 @@ def _epg_load() -> dict:
                 desc = str(desc_el.text or "").strip() if desc_el is not None else ""
                 start = str(pr.get("start") or "")
                 stop = str(pr.get("stop") or "")
-                programmes.setdefault(cid_to_name[cid], []).append((start, stop, title, desc))
+                programmes.setdefault(cid_to_name[cid], []).append((start, stop, title, desc, cid_to_icon.get(cid, "")))
             for name, entries in programmes.items():
                 channels.setdefault(_epg_norm(name), []).extend(entries)
         except Exception:
@@ -630,6 +634,70 @@ def _epg_load() -> dict:
     except Exception:
         pass
     return channels
+
+
+@app.get("/vavoo/program/info")
+def vavoo_program_info(title: str = Query("")):
+    """TMDB-Metadaten zu einer laufenden Sendung (nur Anzeige, keine EPG)."""
+    if not title.strip():
+        return {}
+    cache_key = f"vavoo|program|{title}"
+    if cache_key in _TMDB_CACHE:
+        return _TMDB_CACHE[cache_key]
+    out = {}
+    try:
+        search = _tmdb_get("search/multi", {"query": title.strip()}) or {}
+        pick = None
+        for r in (search.get("results") or []):
+            if r.get("media_type") in ("movie", "tv") and r.get("backdrop_path"):
+                pick = r
+                break
+        if pick:
+            mt = pick["media_type"]
+            mid = str(pick.get("id") or "")
+            detail = _tmdb_get(f"{mt}/{mid}", {}) or {}
+            genres = [
+                g.get("name") for g in (detail.get("genres") or [])
+                if g.get("name")
+            ]
+            rating = detail.get("vote_average")
+            fsk = ""
+            try:
+                if mt == "movie":
+                    rel = _tmdb_get(f"movie/{mid}/release_dates", {}) or {}
+                    for country in (rel.get("results") or []):
+                        if country.get("iso_3166_1") == "DE":
+                            for rd in (country.get("release_dates") or []):
+                                cert = str(rd.get("certification") or "")
+                                if cert:
+                                    fsk = cert
+                                    break
+                else:
+                    cr = _tmdb_get(f"tv/{mid}/content_ratings", {}) or {}
+                    for country in (cr.get("results") or []):
+                        if country.get("iso_3166_1") == "DE":
+                            fsk = str(country.get("rating") or "")
+                            break
+            except Exception:
+                pass
+            out = {
+                "backdrop_url": (
+                    "https://image.tmdb.org/t/p/w780" + pick["backdrop_path"]
+                ),
+                "poster_url": (
+                    "https://image.tmdb.org/t/p/w500" + pick["poster_path"]
+                    if pick.get("poster_path") else ""
+                ),
+                "rating": round(float(rating), 1) if rating else None,
+                "genres": genres[:3],
+                "overview": str(detail.get("overview") or "")[:400],
+                "year": str(pick.get("release_date") or pick.get("first_air_date") or "")[:4],
+                "fsk": fsk,
+            }
+    except Exception:
+        pass
+    _TMDB_CACHE[cache_key] = out
+    return out
 
 
 @app.get("/vavoo/epg")
@@ -656,7 +724,9 @@ def vavoo_epg():
         if not entries:
             continue
         current = None
-        for start, stop, name, desc in entries:
+        idx = -1
+        for i, entry in enumerate(entries):
+            start, stop, name, desc, icon = entry
             try:
                 s = datetime.strptime(start[:14], "%Y%m%d%H%M%S")
                 e = datetime.strptime(stop[:14], "%Y%m%d%H%M%S")
@@ -668,9 +738,25 @@ def vavoo_epg():
                     "start": s.strftime("%H:%M"),
                     "end": e.strftime("%H:%M"),
                     "description": desc[:300],
+                    "icon": icon,
+                    "progress": max(
+                        0.0,
+                        min(1.0, (now - s).total_seconds()
+                            / max(1.0, (e - s).total_seconds())),
+                    ),
                 }
+                idx = i
                 break
         if current:
+            upcoming = []
+            for entry in entries[idx + 1: idx + 4]:
+                st, sp, nm, ds, ic = entry
+                upcoming.append({
+                    "title": nm,
+                    "start": str(st)[8:10] + ":" + str(st)[10:12],
+                    "end": str(sp)[8:10] + ":" + str(sp)[10:12],
+                })
+            current["upcoming"] = upcoming
             out[title] = current
     return {"programs": out, "count": len(out)}
 
