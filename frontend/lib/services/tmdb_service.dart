@@ -268,6 +268,42 @@ class TmdbService {
     return out;
   }
 
+  /// Neueste Titel pro Anbieter (Dart-Direktmodus fuer Android/Fire TV).
+  Future<List<Map<String, dynamic>>> recentByProvider({int limit = 8}) async {
+    final providerList = await providers();
+    final out = <Map<String, dynamic>>[];
+    for (final p in providerList.take(12)) {
+      final items = <Map<String, dynamic>>[];
+      final seen = <String>{};
+      for (final entry in [
+        {'path': 'discover/movie', 'type': 'movie', 'sort': 'release_date.desc'},
+        {'path': 'discover/tv', 'type': 'tv', 'sort': 'first_air_date.desc'},
+      ]) {
+        final data = await _get(entry['path']!, {
+          'with_watch_providers': p['id'],
+          'watch_region': 'DE',
+          'sort_by': entry['sort'],
+          'page': 1,
+        }) ?? {};
+        for (final r in (data['results'] as List?) ?? []) {
+          final it = await toItem(r, entry['type']!);
+          if (it != null && seen.add(it['title'].toString())) items.add(it);
+          if (items.length >= limit) break;
+        }
+        if (items.length >= limit) break;
+      }
+      if (items.isNotEmpty) {
+        out.add({
+          'id': p['id'],
+          'name': p['name'] ?? '',
+          'logo_url': p['logo_url'] ?? '',
+          'items': items,
+        });
+      }
+    }
+    return out;
+  }
+
   static List<Map<String, dynamic>> sectionConfigs() {
     final now = DateTime.now();
     final gte = now.toIso8601String().substring(0, 10);

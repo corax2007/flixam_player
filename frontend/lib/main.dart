@@ -101,6 +101,9 @@ class _HomePageState extends State<HomePage> {
   bool showHome = true;
   bool showFavorites = false;
   bool showSourceEpisodes = false;
+  bool showProviderNew = false;
+  bool providerNewLoading = false;
+  List<dynamic> providerNewGroups = [];
   String? sourceEpisodesLabel;
   String sourceEpisodesTitle = '';
   List<dynamic> sourceEpisodeSeasons = [];
@@ -1358,6 +1361,109 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
   }
 
+  Future<void> _toggleProviderNew() async {
+    if (showProviderNew) {
+      setState(() => showProviderNew = false);
+      return;
+    }
+    setState(() {
+      showProviderNew = true;
+      showFavorites = false;
+      showSourceEpisodes = false;
+      showHome = false;
+      heroItem = null;
+      providerNewLoading = true;
+    });
+    if (providerNewGroups.isEmpty) {
+      try {
+        final groups = await api.providerRecent();
+        if (mounted) setState(() => providerNewGroups = groups);
+      } catch (_) {}
+    }
+    if (mounted) setState(() => providerNewLoading = false);
+  }
+
+  List<Widget> _buildProviderNewSlivers() {
+    if (providerNewLoading) {
+      return [
+        const SliverToBoxAdapter(
+          child: SizedBox(
+            height: 200,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      ];
+    }
+    if (providerNewGroups.isEmpty) {
+      return [
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Keine neuen Titel bei den Anbietern gefunden.'),
+          ),
+        ),
+      ];
+    }
+    final list = <Widget>[
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Neu bei allen Anbietern',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() => showProviderNew = false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
+    for (final g in providerNewGroups) {
+      final items = ((g['items'] as List?) ?? [])
+          .whereType<Map>()
+          .map((m) => m.cast<String, dynamic>())
+          .toList();
+      if (items.isEmpty) continue;
+      list.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: Row(
+            children: [
+              Icon(Icons.new_releases, size: 16, color: accent(context)),
+              const SizedBox(width: 6),
+              Text(
+                g['name']?.toString() ?? 'Anbieter',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      ));
+      list.add(SliverToBoxAdapter(
+        child: SizedBox(
+          height: 206,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (ctx, i) =>
+                _homeItemCard(items[i], autofocus: i == 0),
+          ),
+        ),
+      ));
+    }
+    return list;
+  }
+
   Future<void> _selectProvider(int? id) async {
     if (id == null) {
       setState(() {
@@ -2551,7 +2657,10 @@ class _HomePageState extends State<HomePage> {
           _aetherNavItem(Icons.search, 'Suche',
               active: false, onTap: () => _search()),
           _aetherNavItem(Icons.movie_outlined, 'Filme',
-              active: !showHome && !showFavorites, onTap: _browseRoot),
+              active: !showHome && !showFavorites && !showProviderNew && !showSourceEpisodes,
+              onTap: _browseRoot),
+          _aetherNavItem(Icons.new_releases, 'Neu bei Anbietern',
+              active: showProviderNew, onTap: _toggleProviderNew),
           _aetherNavItem(Icons.favorite_border, 'Favoriten', active: showFavorites,
               onTap: () => setState(() {
                     showFavorites = !showFavorites;
@@ -2921,10 +3030,20 @@ class _HomePageState extends State<HomePage> {
                         },
                         child: const Text('Reset'),
                       ),
+                      const SizedBox(width: 6),
+                      ActionChip(
+                        avatar: Icon(Icons.new_releases,
+                            size: 14, color: accent(context)),
+                        label: Text(showProviderNew
+                            ? 'Zurück zur Home'
+                            : 'Neu bei Anbietern'),
+                        onPressed: _toggleProviderNew,
+                      ),
                     ],
                   ),
                 ),
               ),
+              if (showProviderNew) ..._buildProviderNewSlivers(),
               if (showFavorites) ..._buildFavoriteSlivers(),
               if (showSourceEpisodes) ..._buildSourceEpisodeSlivers(),
               if (loading) const SliverToBoxAdapter(child: LinearProgressIndicator()),

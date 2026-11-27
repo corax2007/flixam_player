@@ -891,6 +891,49 @@ def tmdb_providers():
     return {"providers": result}
 
 
+@app.get("/tmdb/providers/recent")
+def tmdb_providers_recent(limit: int = 8):
+    """Neueste Titel pro Streaminganbieter (DE), nach Release-Datum sortiert."""
+    cache_key = f"providers|recent|{limit}"
+    if cache_key in _TMDB_CACHE:
+        return {"groups": _TMDB_CACHE[cache_key]}
+    providers = (tmdb_providers().get("providers") or [])[:12]
+    from concurrent.futures import ThreadPoolExecutor
+
+    def fetch(p):
+        items = []
+        seen = set()
+        for path, media_type, sort_by in (
+            ("discover/movie", "movie", "release_date.desc"),
+            ("discover/tv", "tv", "first_air_date.desc"),
+        ):
+            data = _tmdb_get(path, {
+                "with_watch_providers": p.get("id"),
+                "watch_region": "DE",
+                "sort_by": sort_by,
+                "page": 1,
+            }) or {}
+            for r in (data.get("results") or []):
+                item = _tmdb_to_item(r, media_type)
+                if item and item.get("title") and item["title"] not in seen:
+                    seen.add(item["title"])
+                    items.append(item)
+        return {
+            "id": p.get("id"),
+            "name": p.get("name") or "",
+            "logo_url": p.get("logo_url") or "",
+            "items": items[:limit],
+        }
+
+    groups = []
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for group in pool.map(fetch, providers):
+            if group["items"]:
+                groups.append(group)
+    _TMDB_CACHE[cache_key] = groups
+    return {"groups": groups}
+
+
 @app.get("/tmdb/provider")
 def tmdb_provider(id: str = Query(""), type: str = Query("all")):
     """Alle Filme/Serien eines Streaminganbieters (DE)."""
