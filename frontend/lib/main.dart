@@ -1513,20 +1513,6 @@ class _HomePageState extends State<HomePage> {
           fit: StackFit.expand,
           children: [
             if (backdrop.isNotEmpty)
-              if (aether)
-                Transform.translate(
-                  offset: const Offset(-210, 0),
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.width,
-                    child: Image.network(
-                      backdrop,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      errorBuilder: (_, _, _) => Container(color: surf(context)),
-                    ),
-                  ),
-                )
-              else
                 Image.network(
                   backdrop,
                   fit: BoxFit.cover,
@@ -1542,9 +1528,9 @@ class _HomePageState extends State<HomePage> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      bg(context).withValues(alpha: 0.58),
-                      bg(context).withValues(alpha: 0.48),
-                      bg(context).withValues(alpha: 0.10),
+                      bg(context).withValues(alpha: 0.22),
+                      bg(context).withValues(alpha: 0.24),
+                      bg(context).withValues(alpha: 0.04),
                     ],
                     stops: const [0.0, 0.5, 1.0],
                   ),
@@ -1570,7 +1556,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             Positioned(
-              left: 24,
+              left: aether ? 234 : 24,
               bottom: 20,
               child: SizedBox(
                 width: 520,
@@ -2472,10 +2458,14 @@ class _HomePageState extends State<HomePage> {
 
   Widget _aetherSidebar() {
     final d = designAt(appSettings.design);
-    return Container(
+    return SizedBox(
       width: 210,
-      color: d.background.withValues(alpha: 0.70),
-      child: Column(
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            color: d.background.withValues(alpha: 0.24),
+            child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 18),
@@ -2594,14 +2584,35 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
-    );
+    ),
+    ),
+  );
+  }
+
+  /// Bei Aether bekommt alles links Platz für die Sidebar - nur der Hero
+  /// bleibt full-bleed und läuft hinter der Seitenleiste durch.
+  List<Widget> _aetherAwareSlivers(List<Widget> slivers) {
+    if (appSettings.layout != 1 || Platform.isAndroid) return slivers;
+    return [
+      for (final sliver in slivers)
+        if (sliver is SliverToBoxAdapter &&
+            sliver.child is SizedBox &&
+            (sliver.child as SizedBox).height == 340)
+          sliver
+        else
+          SliverPadding(
+            padding: const EdgeInsets.only(left: 210),
+            sliver: sliver,
+          ),
+    ];
   }
 
   Widget _buildContentScroller() {
     return CustomScrollView(
-            slivers: [
+            slivers: _aetherAwareSlivers([
               if (appSettings.layout != 1) ...[
               SliverAppBar(
                 pinned: true,
@@ -3039,7 +3050,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
-            ],
+            ]),
           );
   }
 
@@ -3053,10 +3064,16 @@ class _HomePageState extends State<HomePage> {
           if (Platform.isAndroid) BrowserResolver.instance.buildHiddenView(),
           if (appSettings.layout == 1 && !Platform.isAndroid)
             Positioned.fill(
-              child: Row(
+              child: Stack(
                 children: [
-                  _aetherSidebar(),
-                  Expanded(child: _buildContentScroller()),
+                  _buildContentScroller(),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 210,
+                    child: _aetherSidebar(),
+                  ),
                 ],
               ),
             )
