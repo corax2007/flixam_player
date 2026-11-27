@@ -4,6 +4,7 @@ import 'services/api_service.dart';
 import 'services/user_prefs.dart';
 import 'services/availability_service.dart';
 import 'person_page.dart';
+import 'services/theme_service.dart';
 
 /// Vollbild-Details zu einem Film/einer Serie (TMDB).
 class DetailPage extends StatefulWidget {
@@ -178,7 +179,7 @@ class _DetailPageState extends State<DetailPage> {
     Future<void> openMenu(Offset pos) async {
       final choice = await showMenu<String>(
           context: context,
-          color: const Color(0xFF16161A),
+          color: surf(context),
           position: RelativeRect.fromLTRB(
             pos.dx,
             pos.dy,
@@ -222,7 +223,7 @@ class _DetailPageState extends State<DetailPage> {
           ],
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 28),
+          icon: Icon(Icons.play_circle_fill, color: accent(context), size: 28),
           tooltip: widget.autoPlaySeason
               ? 'Folge und Staffel abspielen'
               : 'Folge abspielen',
@@ -251,7 +252,7 @@ class _DetailPageState extends State<DetailPage> {
     final episodes = (season['episodes'] as List?) ?? [];
     final poster = season['poster_url']?.toString() ?? '';
     return Card(
-      color: const Color(0xFF16161A),
+      color: surf(context),
       child: ExpansionTile(
         initiallyExpanded: _openSeasons.contains(number),
         onExpansionChanged: (open) => setState(() {
@@ -305,7 +306,7 @@ class _DetailPageState extends State<DetailPage> {
         SingleActivator(LogicalKeyboardKey.escape): () => Navigator.of(context).maybePop(),
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0A0C),
+        backgroundColor: bg(context),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : CustomScrollView(
@@ -313,7 +314,7 @@ class _DetailPageState extends State<DetailPage> {
                   SliverAppBar(
                     expandedHeight: 340,
                     pinned: true,
-                    backgroundColor: const Color(0xFF0A0A0C),
+                    backgroundColor: bg(context),
                     leading: IconButton(
                       icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.of(context).pop(),
@@ -328,17 +329,17 @@ class _DetailPageState extends State<DetailPage> {
                               backdrop,
                               fit: BoxFit.cover,
                               alignment: Alignment.topCenter,
-                              errorBuilder: (_, _, _) => Container(color: const Color(0xFF16161A)),
+                              errorBuilder: (_, _, _) => Container(color: surf(context)),
                             ),
-                          const DecoratedBox(
+                          DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Colors.transparent,
-                                  Color(0xAA0A0A0C),
-                                  Color(0xFF0A0A0C),
+                                  bg(context).withValues(alpha: 0.67),
+                                  bg(context),
                                 ],
                               ),
                             ),

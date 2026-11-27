@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'services/process_manager.dart';
 import 'services/api_service.dart';
 import 'services/settings_service.dart';
+import 'services/theme_service.dart';
 import 'services/user_prefs.dart';
 import 'services/browser_resolver.dart';
 import 'services/availability_service.dart';
@@ -36,23 +37,33 @@ void main() {
   runApp(const FlixamApp());
 }
 
-class FlixamApp extends StatelessWidget {
+class FlixamApp extends StatefulWidget {
   const FlixamApp({super.key});
+  @override
+  State<FlixamApp> createState() => _FlixamAppState();
+}
+
+class _FlixamAppState extends State<FlixamApp> {
+  final AppSettings settings = AppSettings.load();
+
+  void _onDesignChanged(int index) {
+    setState(() => settings.design = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'flixam_player',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0C),
-        colorScheme: const ColorScheme.dark(surface: Color(0xFF16161A)),
-      ),
+      theme: flixamTheme(settings.design),
       home: Builder(
         builder: (context) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(Platform.isAndroid ? 1.25 : 1.0),
           ),
-          child: const HomePage(),
+          child: HomePage(
+            settings: settings,
+            onDesignChanged: _onDesignChanged,
+          ),
         ),
       ),
     );
@@ -60,14 +71,17 @@ class FlixamApp extends StatelessWidget {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final AppSettings? settings;
+  final ValueChanged<int>? onDesignChanged;
+
+  const HomePage({super.key, this.settings, this.onDesignChanged});
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   final ApiService api = ApiService();
-  final AppSettings appSettings = AppSettings.load();
+  late final AppSettings appSettings = widget.settings ?? AppSettings.load();
   final UserPrefs prefs = UserPrefs();
   final Player player = Player();
   late final VideoController videoController = VideoController(player);
@@ -773,6 +787,68 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _designPreview(FlixamDesign d, {required bool selected}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            color: d.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? d.accent : Colors.white24,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 30,
+                width: double.infinity,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    d.surface,
+                    d.accent.withValues(alpha: 0.5),
+                  ]),
+                ),
+                child: Container(
+                  width: 26,
+                  height: 4,
+                  color: Colors.white70,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+                child: Row(
+                  children: [
+                    Container(width: 12, height: 12, color: d.surface),
+                    const SizedBox(width: 3),
+                    Container(width: 12, height: 12, color: d.surface),
+                    const SizedBox(width: 3),
+                    Container(width: 12, height: 12, color: d.accent),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          d.name,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 9,
+            color: selected ? d.accent : Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _showSettings() async {
     final confirmed = await showCupertinoModalPopup<bool>(
       context: context,
@@ -780,9 +856,9 @@ class _HomePageState extends State<HomePage> {
         return CupertinoApp(
           theme: const CupertinoThemeData(brightness: Brightness.dark),
           home: CupertinoPageScaffold(
-            backgroundColor: const Color(0xFF0A0A0C),
+            backgroundColor: bg(context),
             navigationBar: CupertinoNavigationBar(
-              backgroundColor: const Color(0xFF0A0A0C),
+              backgroundColor: bg(context),
               middle: const Text('Einstellungen'),
               leading: CupertinoNavigationBarBackButton(),
               trailing: SizedBox(
@@ -807,6 +883,31 @@ class _HomePageState extends State<HomePage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const Text('Design',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          for (var i = 0; i < flixamDesigns.length; i++) ...[
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  setState(() => appSettings.design = i);
+                                  await appSettings.save();
+                                  widget.onDesignChanged?.call(i);
+                                },
+                                child: _designPreview(
+                                  flixamDesigns[i],
+                                  selected: appSettings.design == i,
+                                ),
+                              ),
+                            ),
+                            if (i < flixamDesigns.length - 1)
+                              const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       if (!Platform.isAndroid) ...[
                         const Text('VPN-Tunnel aktivieren (wireproxy)',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -985,7 +1086,7 @@ class _HomePageState extends State<HomePage> {
     final title = item['title']?.toString() ?? '';
     final value = await showMenu<String>(
       context: context,
-      color: const Color(0xFF16161A),
+      color: surf(context),
       position: RelativeRect.fromLTRB(
         details.globalPosition.dx,
         details.globalPosition.dy,
@@ -1319,14 +1420,14 @@ class _HomePageState extends State<HomePage> {
                 // Backdrops sind 16:9, das Banner viel breiter - oben
                 // ausrichten, damit Gesichter nicht abgeschnitten werden.
                 alignment: Alignment.topCenter,
-                errorBuilder: (_, _, _) => Container(color: const Color(0xFF16161A)),
+                errorBuilder: (_, _, _) => Container(color: surf(context)),
               ),
-            const DecoratedBox(
+            DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xFF0A0A0C)],
+                  colors: [Colors.transparent, bg(context)],
                 ),
               ),
             ),
@@ -1350,8 +1451,8 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Text(
                       eyebrow,
-                      style: const TextStyle(
-                        color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        color: accent(context), fontSize: 12, fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1672,7 +1773,7 @@ class _HomePageState extends State<HomePage> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: focused
-              ? Border.all(color: Colors.redAccent, width: 3)
+              ? Border.all(color: accent(context), width: 3)
               : null,
         ),
         child: SizedBox(
@@ -1702,10 +1803,10 @@ class _HomePageState extends State<HomePage> {
                         child: Icon(Icons.check_circle, color: Colors.green, size: 18),
                       ),
                     if (prefs.isFavorite(it))
-                      const Positioned(
+                      Positioned(
                         right: 4,
                         top: 4,
-                        child: Icon(Icons.favorite, color: Colors.redAccent, size: 18),
+                        child: Icon(Icons.favorite, color: accent(context), size: 18),
                       ),
                     if (_sourceLabel(it).isNotEmpty)
                       Positioned(
@@ -2196,7 +2297,7 @@ class _HomePageState extends State<HomePage> {
                     else
                       DropdownButton<String>(
                         value: selectedSource,
-                        dropdownColor: const Color(0xFF16161A),
+                        dropdownColor: surf(context),
                         items: const [
                           DropdownMenuItem(value: 'Alle', child: Text('Alle Quellen')),
                           DropdownMenuItem(value: 'netzkino', child: Text('Netzkino')),
@@ -2223,7 +2324,7 @@ class _HomePageState extends State<HomePage> {
                         value: selectedProviderId,
                         hint: const Text('Anbieter'),
                         isExpanded: true,
-                        dropdownColor: const Color(0xFF16161A),
+                        dropdownColor: surf(context),
                         items: [
                           const DropdownMenuItem<int?>(
                             value: null,
@@ -2250,7 +2351,7 @@ class _HomePageState extends State<HomePage> {
                         decoration: InputDecoration(
                           hintText: 'Suche...',
                           filled: true,
-                          fillColor: const Color(0xFF16161A),
+                          fillColor: surf(context),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         ),
                         onSubmitted: (_) => _search(),
@@ -2268,7 +2369,7 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.white,
                       icon: Icon(
                         showFavorites ? Icons.favorite : Icons.favorite_border,
-                        color: showFavorites ? Colors.redAccent : Colors.white,
+                        color: showFavorites ? accent(context) : Colors.white,
                       ),
                       onPressed: () => setState(() {
                         showFavorites = !showFavorites;
@@ -2535,10 +2636,10 @@ class _HomePageState extends State<HomePage> {
                         },
                         builder: (focused) => Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF16161A),
+                            color: surf(context),
                             borderRadius: BorderRadius.circular(16),
                             border: focused
-                                ? Border.all(color: Colors.redAccent, width: 3)
+                                ? Border.all(color: accent(context), width: 3)
                                 : Border.all(color: Colors.white.withValues(alpha: 0.08)),
                           ),
                           child: Stack(

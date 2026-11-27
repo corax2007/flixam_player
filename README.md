@@ -18,6 +18,8 @@ Wiedergabe-Fortschritt. Die Oberfläche ist auf Deutsch.
   Pause abspielen** (Einstellungen → Zahnrad)
 - **Player**: Fortsetzen, Suchleiste, +/-10 s, Lautstärke, Endzeit-Anzeige,
   automatisch ausgeblendete untere Steuerung, dauerhaft sichtbare obere Leiste
+- **Designs**: 5 auswählbare Looks (Klassisch, Mitternacht, Wald, Violett,
+  Amber) mit Mini-Vorschau in den Optionen (Zahnrad)
 - **Persönlich**: Favoriten, 5-Sterne-Bewertung, Notizen/Schnell-Tags
   („Sehr brutal", „Brutal", „Gruselig", …), Fortschritt pro Folge und Film
 

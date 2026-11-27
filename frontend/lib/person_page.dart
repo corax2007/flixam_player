@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
+import 'services/theme_service.dart';
 
 /// Alle Filme/Serien eines Schauspielers (TMDB-Person).
 class PersonPage extends StatefulWidget {
@@ -69,7 +70,7 @@ class _PersonPageState extends State<PersonPage> {
     final items = (d['items'] as List?) ?? [];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0C),
+      backgroundColor: bg(context),
       body: loading
           ? Center(child: CircularProgressIndicator())
           : CustomScrollView(
@@ -77,7 +78,7 @@ class _PersonPageState extends State<PersonPage> {
                 SliverAppBar(
                   expandedHeight: 320,
                   pinned: true,
-                  backgroundColor: const Color(0xFF0A0A0C),
+                  backgroundColor: bg(context),
                   leading: IconButton(
                     icon: const Icon(Icons.arrow_back),
                     onPressed: () => Navigator.of(context).pop(),
@@ -93,17 +94,17 @@ class _PersonPageState extends State<PersonPage> {
                             profile,
                             fit: BoxFit.cover,
                             alignment: Alignment.topCenter,
-                            errorBuilder: (_, _, _) => Container(color: const Color(0xFF16161A)),
+                            errorBuilder: (_, _, _) => Container(color: surf(context)),
                           ),
-                        const DecoratedBox(
+                        DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Color(0xAA0A0A0C),
-                                Color(0xFF0A0A0C),
+                                bg(context).withValues(alpha: 0.67),
+                                bg(context),
                               ],
                             ),
                           ),
@@ -148,7 +149,7 @@ class _PersonPageState extends State<PersonPage> {
                               padding: const EdgeInsets.symmetric(vertical: 6),
                               child: Text(
                                 showFullBio ? 'weniger anzeigen' : 'mehr anzeigen',
-                                style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                                style: TextStyle(color: accent(context), fontSize: 12),
                               ),
                             ),
                           ),

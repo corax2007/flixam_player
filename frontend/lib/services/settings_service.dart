@@ -9,6 +9,7 @@ class AppSettings {
   bool heroInBrowse;
   bool onlyAvailable;
   bool autoPlaySeason;
+  int design;
   String backendUrl;
 
   static const String defaultBackendUrl = String.fromEnvironment(
@@ -23,6 +24,7 @@ class AppSettings {
     this.heroInBrowse = true,
     this.onlyAvailable = true,
     this.autoPlaySeason = false,
+    this.design = 0,
     this.backendUrl = defaultBackendUrl,
   });
 
@@ -43,6 +45,7 @@ class AppSettings {
           heroInBrowse: map['heroInBrowse'] as bool? ?? true,
           onlyAvailable: map['onlyAvailable'] as bool? ?? true,
           autoPlaySeason: map['autoPlaySeason'] as bool? ?? false,
+          design: val('design', 0),
           backendUrl: map['backendUrl']?.toString().isNotEmpty ?? false
               ? map['backendUrl'].toString()
               : defaultBackendUrl,
@@ -61,6 +64,7 @@ class AppSettings {
         'heroInBrowse': heroInBrowse,
         'onlyAvailable': onlyAvailable,
         'autoPlaySeason': autoPlaySeason,
+        'design': design,
         'backendUrl': backendUrl,
       }));
     } catch (_) {}
