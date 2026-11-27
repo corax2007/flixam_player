@@ -544,6 +544,35 @@ ADDON_CATALOG_SITES = [
 ]
 
 
+@app.get("/vavoo/channels")
+def vavoo_channels():
+    """Live-TV-Senderliste aus dem Vavoo-Addon (DE)."""
+    cache_key = "vavoo|channels"
+    if cache_key in _TMDB_CACHE:
+        return {"channels": _TMDB_CACHE[cache_key]}
+    try:
+        items = run_addon(
+            "plugin.video.xstream",
+            "plugin://plugin.video.xstream/?site=vavootv",
+        )
+    except Exception:
+        return {"channels": []}
+    out = []
+    seen = set()
+    for it in items:
+        title = re.sub(r"\[COLOR[^\]]*\]|\[/COLOR\]", "",
+                       str(it.get("title") or "")).strip()
+        url = str(it.get("url") or "")
+        if not title or not url or "refresh_channels" in url:
+            continue
+        if title in seen:
+            continue
+        seen.add(title)
+        out.append({"title": title, "url": url})
+    _TMDB_CACHE[cache_key] = out
+    return {"channels": out, "count": len(out)}
+
+
 @app.get("/addon/catalog/sites")
 def addon_catalog_sites():
     """Alle xStream-Sites mit echtem Bestands-Katalog."""

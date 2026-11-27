@@ -48,6 +48,18 @@ class ApiService {
     );
   }
 
+  Future<List<dynamic>> vavooChannels() async {
+    if (useDirect) return [];
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/vavoo/channels'))
+          .timeout(const Duration(seconds: 180));
+      final j = jsonDecode(r.body) as Map<String, dynamic>;
+      return (j['channels'] as List?) ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<dynamic>> addonCatalogSites() async {
     if (useDirect) return [];
     try {

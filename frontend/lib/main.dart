@@ -103,6 +103,10 @@ class _HomePageState extends State<HomePage> {
   bool showSourceEpisodes = false;
   bool showProviderNew = false;
   bool providerNewLoading = false;
+  bool showLiveTv = false;
+  bool liveLoading = false;
+  List<dynamic> liveChannels = [];
+  final TextEditingController liveSearchCtrl = TextEditingController();
   bool showViewPanel = false;
   final Map<String, Map<String, dynamic>> _listPreviewBySection = {};
   bool showAddonCatalog = false;
@@ -1095,6 +1099,14 @@ class _HomePageState extends State<HomePage> {
               child: const Text('Filter zurücksetzen'),
             ),
             const Spacer(),
+            TextButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _toggleLiveTv();
+              },
+              icon: const Icon(Icons.live_tv, size: 15),
+              label: const Text('Live TV'),
+            ),
             TextButton.icon(
               onPressed: () async {
                 Navigator.of(context).pop();
@@ -2092,6 +2104,151 @@ class _HomePageState extends State<HomePage> {
         addonCatalogLoading = false;
       });
     }
+  }
+
+  Future<void> _toggleLiveTv() async {
+    if (showLiveTv) {
+      setState(() => showLiveTv = false);
+      return;
+    }
+    setState(() {
+      showLiveTv = true;
+      showAddonCatalog = false;
+      showNewSeries = false;
+      showProviderNew = false;
+      showFavorites = false;
+      showSourceEpisodes = false;
+      showHome = false;
+      heroItem = null;
+    });
+    if (liveChannels.isEmpty) {
+      setState(() => liveLoading = true);
+      final channels = await api.vavooChannels();
+      if (mounted) {
+        setState(() {
+          liveChannels = channels;
+          liveLoading = false;
+        });
+      }
+    }
+  }
+
+  List<Widget> _buildLiveTvSlivers() {
+    final list = <Widget>[
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Live TV · Vavoo (${liveChannels.length})',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() => showLiveTv = false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
+    if (Platform.isAndroid) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text(
+            'Live TV benötigt das Linux-Backend (Vavoo-Addon).',
+            style: TextStyle(color: Colors.orange),
+          ),
+        ),
+      ));
+      return list;
+    }
+    list.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: TextField(
+          controller: liveSearchCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Sender suchen...',
+            isDense: true,
+            prefixIcon: Icon(Icons.search, size: 18),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+    ));
+    if (liveLoading) {
+      list.add(const SliverToBoxAdapter(
+        child: SizedBox(
+          height: 160,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ));
+      return list;
+    }
+    final q = liveSearchCtrl.text.trim().toLowerCase();
+    final channels = liveChannels.where((c) {
+      if (q.isEmpty) return true;
+      return (c['title']?.toString() ?? '').toLowerCase().contains(q);
+    }).toList();
+    if (channels.isEmpty) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('Keine Sender gefunden.'),
+        ),
+      ));
+      return list;
+    }
+    list.add(SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 180,
+          childAspectRatio: 3 / 1.2,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (ctx, i) {
+            final title = channels[i]['title']?.toString() ?? '';
+            return InkWell(
+              onTap: () => _play(channels[i]['url']?.toString() ?? '', title),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: surf(context),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.live_tv, size: 18, color: accent(context)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          childCount: channels.length,
+        ),
+      ),
+    ));
+    return list;
   }
 
   Future<void> _toggleAddonCatalog() async {
@@ -3856,8 +4013,10 @@ class _HomePageState extends State<HomePage> {
           _aetherNavItem(Icons.search, 'Suche',
               active: false, onTap: () => _search()),
           _aetherNavItem(Icons.movie_outlined, 'Filme',
-              active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showAddonCatalog && !showSourceEpisodes,
+              active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showAddonCatalog && !showLiveTv && !showSourceEpisodes,
               onTap: _browseRoot),
+          _aetherNavItem(Icons.live_tv, 'Live TV',
+              active: showLiveTv, onTap: _toggleLiveTv),
           _aetherNavItem(Icons.storage, 'Addon-Bestand',
               active: showAddonCatalog, onTap: _toggleAddonCatalog),
           _aetherNavItem(Icons.new_releases, 'Neu bei Anbietern',
@@ -4116,6 +4275,7 @@ class _HomePageState extends State<HomePage> {
                   myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
                   myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
                 ),
+              if (showLiveTv) ..._buildLiveTvSlivers(),
               if (showAddonCatalog) ..._buildAddonCatalogSlivers(),
               if (showNewSeries) ..._buildNewSeriesSlivers(),
               if (showProviderNew) ..._buildProviderNewSlivers(),
