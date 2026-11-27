@@ -104,7 +104,7 @@ class _HomePageState extends State<HomePage> {
   bool showProviderNew = false;
   bool providerNewLoading = false;
   bool showViewPanel = false;
-  Map<String, dynamic>? _listPreviewItem;
+  final Map<String, Map<String, dynamic>> _listPreviewBySection = {};
   bool showAddonCatalog = false;
   bool addonCatalogLoading = false;
   List<dynamic> addonSites = [];
@@ -2415,7 +2415,10 @@ class _HomePageState extends State<HomePage> {
           ),
         ));
       } else {
-        list.add(SliverToBoxAdapter(child: _buildCoverRow(items)));
+        list.add(SliverToBoxAdapter(
+          child: _buildCoverRow(items,
+              section: g['name']?.toString() ?? ''),
+        ));
       }
     }
     return list;
@@ -2994,7 +2997,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Eine Kachel fuer die Home-Reihen (horizontal oder im auf geklappten Raster).
-  Widget _buildCoverRow(List<dynamic> items) {
+  Widget _buildCoverRow(List<dynamic> items, {String section = ''}) {
     final mode = appSettings.viewMode;
     if (mode != 0 && mode != 1) {
       return SizedBox(
@@ -3010,7 +3013,8 @@ class _HomePageState extends State<HomePage> {
       );
     }
     if (items.isEmpty) return const SizedBox.shrink();
-    final preview = _listPreviewItem ?? (items.first as Map<String, dynamic>);
+    final preview = _listPreviewBySection[section] ??
+        (items.first as Map<String, dynamic>);
     final listPane = Expanded(
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -3041,7 +3045,7 @@ class _HomePageState extends State<HomePage> {
             subtitle: Text(it['year']?.toString() ?? '',
                 style: const TextStyle(fontSize: 10, color: Colors.white54)),
             onTap: () {
-              setState(() => _listPreviewItem = it);
+              setState(() => _listPreviewBySection[section] = it);
               _loadHeroSources(title);
               _loadHeroTrailer(it);
             },
@@ -3634,6 +3638,7 @@ class _HomePageState extends State<HomePage> {
         list.add(SliverToBoxAdapter(
           child: _buildCoverRow(
             items.map((i) => (i as Map).cast<String, dynamic>()).toList(),
+            section: title,
           ),
         ));
       }
@@ -4273,7 +4278,12 @@ class _HomePageState extends State<HomePage> {
               child: Stack(
                 children: [
                   _aetherFullBackground(),
-                  _buildContentScroller(),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      right: showViewPanel ? 220 : 0,
+                    ),
+                    child: _buildContentScroller(),
+                  ),
                   Positioned(
                     left: 0,
                     top: 0,
@@ -4285,7 +4295,10 @@ class _HomePageState extends State<HomePage> {
               ),
             )
           else
-            _buildContentScroller(),
+            Padding(
+              padding: EdgeInsets.only(right: showViewPanel ? 220 : 0),
+              child: _buildContentScroller(),
+            ),
           if (showViewPanel && !showPlayer)
             Positioned(
               right: 0,
