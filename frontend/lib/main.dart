@@ -928,12 +928,159 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Filter und Suche - aus dem Inhalt in die Optionen ausgelagert.
+  Widget _settingsFilters() {
+    final dd = <Widget>[];
+    Widget dropdown(String label, String value, List<String> values,
+            void Function(String) onChanged) =>
+        SizedBox(
+          width: 132,
+          child: DropdownButton<String>(
+            isExpanded: true,
+            value: values.contains(value) ? value : values.first,
+            hint: Text(label),
+            items: [
+              for (final v in values)
+                DropdownMenuItem<String>(value: v, child: Text(v)),
+            ],
+            onChanged: (v) {
+              if (v != null) onChanged(v);
+            },
+          ),
+        );
+
+    dd.add(dropdown('Monat', monthFilter, [
+      'Alle', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+    ], (v) {
+      final map = {
+        'Januar': '01', 'Februar': '02', 'März': '03', 'April': '04',
+        'Mai': '05', 'Juni': '06', 'Juli': '07', 'August': '08',
+        'September': '09', 'Oktober': '10', 'November': '11',
+        'Dezember': '12', 'Alle': 'Alle',
+      };
+      setState(() => monthFilter = map[v] ?? 'Alle');
+      _onFilterChanged();
+    }));
+    dd.add(dropdown('Typ', filterType.isEmpty ? 'Alle' : filterType,
+        ['Alle', 'Filme', 'Serien'], (v) {
+      setState(() {
+        filterType = v == 'Alle' ? '' : (v == 'Filme' ? 'movie' : 'tv');
+        selectedGenre = null;
+      });
+      _loadGenres();
+      _onFilterChanged();
+    }));
+    final genreValues = <String>['Alle', ...genres.map((g) => g.toString())];
+    dd.add(dropdown('Genre', selectedGenre ?? 'Alle', genreValues, (v) {
+      setState(() => selectedGenre = v == 'Alle' ? null : v);
+      _onFilterChanged();
+    }));
+    dd.add(dropdown('FSK', fskFilter, [
+      'Alle', 'FSK 0', 'FSK 6', 'FSK 12', 'FSK 16', 'FSK 18',
+    ], (v) {
+      setState(() => fskFilter = v);
+      _onFilterChanged();
+    }));
+    dd.add(dropdown('Sortierung', sortOrder, [
+      'Standard', 'Jahr ↓', 'Jahr ↑', 'FSK ↓', 'Bewertung', 'Datum ↓', 'Datum ↑',
+    ], (v) {
+      setState(() => sortOrder = v);
+      _onFilterChanged();
+    }));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Suche & Filter',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: searchCtrl,
+          decoration: const InputDecoration(
+            hintText: 'Titel suchen...',
+            isDense: true,
+            prefixIcon: Icon(Icons.search, size: 18),
+          ),
+          onSubmitted: (_) => _search(),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            SizedBox(
+              width: 100,
+              child: TextField(
+                controller: yearCtrl,
+                decoration: const InputDecoration(
+                  hintText: 'Jahr',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                ),
+                onSubmitted: (_) => _onFilterChanged(),
+                onChanged: (_) => _onFilterChanged(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _search,
+                icon: const Icon(Icons.search, size: 16),
+                label: const Text('Suchen'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 4, children: dd),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  yearCtrl.clear();
+                  searchCtrl.clear();
+                  filterType = '';
+                  selectedGenre = null;
+                  fskFilter = 'Alle';
+                  monthFilter = 'Alle';
+                  sortOrder = 'Standard';
+                });
+                _loadGenres();
+                _onFilterChanged();
+              },
+              child: const Text('Filter zurücksetzen'),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _toggleProviderNew,
+              icon: const Icon(Icons.new_releases, size: 15),
+              label: const Text('Neu bei Anbietern'),
+            ),
+            TextButton.icon(
+              onPressed: _toggleNewSeries,
+              icon: const Icon(Icons.tv_outlined, size: 15),
+              label: const Text('Neue Serien'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
   Future<void> _showSettings() async {
     final confirmed = await showCupertinoModalPopup<bool>(
       context: context,
       builder: (ctx) {
         return CupertinoApp(
           theme: const CupertinoThemeData(brightness: Brightness.dark),
+          localizationsDelegates: const [
+            DefaultMaterialLocalizations.delegate,
+            DefaultCupertinoLocalizations.delegate,
+          ],
+          locale: const Locale('en'),
+          supportedLocales: const [Locale('en')],
           home: CupertinoPageScaffold(
             backgroundColor: bg(context),
             navigationBar: CupertinoNavigationBar(
@@ -963,6 +1110,7 @@ class _HomePageState extends State<HomePage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                      _settingsFilters(),
                       const Text('Layout',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 4),
@@ -3160,158 +3308,6 @@ class _HomePageState extends State<HomePage> {
                     child: const Text('wg0.conf nicht mit echten Zugangsdaten befuellt.'),
                   ),
                 ),
-              if (!showFavorites && !showSourceEpisodes)
-                SliverToBoxAdapter(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                    children: [
-                      SizedBox(
-                        width: 80,
-                        child: TextField(
-                          controller: yearCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'Jahr', isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                          ),
-                          onSubmitted: (_) => _onFilterChanged(),
-                          onChanged: (_) => _onFilterChanged(),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      DropdownButton<String>(
-                        value: monthFilter,
-                        items: const [
-                          DropdownMenuItem(value: 'Alle', child: Text('Monat alle')),
-                          DropdownMenuItem(value: '01', child: Text('Januar')),
-                          DropdownMenuItem(value: '02', child: Text('Februar')),
-                          DropdownMenuItem(value: '03', child: Text('März')),
-                          DropdownMenuItem(value: '04', child: Text('April')),
-                          DropdownMenuItem(value: '05', child: Text('Mai')),
-                          DropdownMenuItem(value: '06', child: Text('Juni')),
-                          DropdownMenuItem(value: '07', child: Text('Juli')),
-                          DropdownMenuItem(value: '08', child: Text('August')),
-                          DropdownMenuItem(value: '09', child: Text('September')),
-                          DropdownMenuItem(value: '10', child: Text('Oktober')),
-                          DropdownMenuItem(value: '11', child: Text('November')),
-                          DropdownMenuItem(value: '12', child: Text('Dezember')),
-                        ],
-                        onChanged: (v) {
-                          setState(() => monthFilter = v ?? 'Alle');
-                          _onFilterChanged();
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      DropdownButton<String>(
-                        value: filterType,
-                        items: const [
-                          DropdownMenuItem(value: '', child: Text('Alle')),
-                          DropdownMenuItem(value: 'movie', child: Text('Filme')),
-                          DropdownMenuItem(value: 'tv', child: Text('Serien')),
-                        ],
-                        onChanged: (v) {
-                          setState(() {
-                            filterType = v ?? '';
-                            selectedGenre = null;
-                          });
-                          _loadGenres();
-                          _onFilterChanged();
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      SizedBox(
-                        width: 130,
-                        child: DropdownButton<String?>(
-                          isExpanded: true,
-                          value: selectedGenre,
-                          hint: const Text('Alle Genres'),
-                          items: [
-                            const DropdownMenuItem<String?>(
-                              value: null, child: Text('Alle Genres'),
-                            ),
-                            ...genres.map(
-                              (g) => DropdownMenuItem<String?>(
-                                value: g['name']?.toString(),
-                                child: Text(g['name']?.toString() ?? ''),
-                              ),
-                            ),
-                          ],
-                          onChanged: (v) {
-                            setState(() => selectedGenre = v);
-                            _onFilterChanged();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      DropdownButton<String>(
-                        value: fskFilter,
-                        items: const [
-                          DropdownMenuItem(value: 'Alle', child: Text('FSK alle')),
-                          DropdownMenuItem(value: 'FSK 0', child: Text('FSK 0')),
-                          DropdownMenuItem(value: 'FSK 6', child: Text('FSK 6')),
-                          DropdownMenuItem(value: 'FSK 12', child: Text('FSK 12')),
-                          DropdownMenuItem(value: 'FSK 16', child: Text('FSK 16')),
-                          DropdownMenuItem(value: 'FSK 18', child: Text('FSK 18')),
-                        ],
-                        onChanged: (v) {
-                          setState(() => fskFilter = v ?? 'Alle');
-                          _onFilterChanged();
-                        },
-                      ),
-                      const SizedBox(width: 6),
-                      DropdownButton<String>(
-                        value: sortOrder,
-                        items: const [
-                          DropdownMenuItem(value: 'Standard', child: Text('Sort: Standard')),
-                          DropdownMenuItem(value: 'Jahr ↓', child: Text('Jahr ↓')),
-                          DropdownMenuItem(value: 'Jahr ↑', child: Text('Jahr ↑')),
-                          DropdownMenuItem(value: 'FSK ↑', child: Text('FSK ↑')),
-                          DropdownMenuItem(value: 'FSK ↓', child: Text('FSK ↓')),
-                          DropdownMenuItem(value: 'Bewertung', child: Text('Bewertung')),
-                          DropdownMenuItem(value: 'Datum ↓', child: Text('Datum ↓')),
-                          DropdownMenuItem(value: 'Datum ↑', child: Text('Datum ↑')),
-                        ],
-                        onChanged: (v) {
-                          setState(() => sortOrder = v ?? 'Standard');
-                          _onFilterChanged();
-                        },
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            yearCtrl.clear();
-                            filterType = '';
-                            selectedGenre = null;
-                            fskFilter = 'Alle';
-                            monthFilter = 'Alle';
-                            sortOrder = 'Standard';
-                          });
-                          _loadGenres();
-                          _onFilterChanged();
-                        },
-                        child: const Text('Reset'),
-                      ),
-                      const SizedBox(width: 6),
-                      ActionChip(
-                        avatar: Icon(Icons.new_releases,
-                            size: 14, color: accent(context)),
-                        label: Text(showProviderNew
-                            ? 'Zurück zur Home'
-                            : 'Neu bei Anbietern'),
-                        onPressed: _toggleProviderNew,
-                      ),
-                      const SizedBox(width: 6),
-                      ActionChip(
-                        avatar: Icon(Icons.tv_outlined,
-                            size: 14, color: accent(context)),
-                        label: const Text('Neue Serien'),
-                        onPressed: _toggleNewSeries,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
               if (!showHome && heroItem != null && appSettings.heroInBrowse)
                 _heroBanner(
                   (heroItem as Map).cast<String, dynamic>(),
