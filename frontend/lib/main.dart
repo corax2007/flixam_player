@@ -1916,6 +1916,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() {
+      searchCtrl.clear();
       showNewSeries = true;
       showProviderNew = false;
       showFavorites = false;
@@ -2180,6 +2181,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() {
+      searchCtrl.clear();
       showLiveTv = true;
       showAddonCatalog = false;
       showNewSeries = false;
@@ -2509,6 +2511,7 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() {
+      searchCtrl.clear();
       showAddonCatalog = true;
       showNewSeries = false;
       showProviderNew = false;
@@ -2655,12 +2658,27 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
+  Future<void> _reloadProviderNew() async {
+    setState(() {
+      providerNewLoading = true;
+      providerNewGroups = [];
+    });
+    final groups = await api.providerRecent();
+    if (mounted) {
+      setState(() {
+        providerNewGroups = groups;
+        providerNewLoading = false;
+      });
+    }
+  }
+
   Future<void> _toggleProviderNew() async {
     if (showProviderNew) {
       setState(() => showProviderNew = false);
       return;
     }
     setState(() {
+      searchCtrl.clear();
       showProviderNew = true;
       showFavorites = false;
       showSourceEpisodes = false;
@@ -2727,10 +2745,21 @@ class _HomePageState extends State<HomePage> {
     }
     if (providerNewGroups.isEmpty) {
       return [
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('Keine neuen Titel bei den Anbietern gefunden.'),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Keine neuen Titel bei den Anbietern gefunden.'),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _reloadProviderNew,
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Erneut laden'),
+                ),
+              ],
+            ),
           ),
         ),
       ];
@@ -3658,11 +3687,26 @@ class _HomePageState extends State<HomePage> {
               ),
               if (!_viewMinimal()) ...[
                 const SizedBox(height: 4),
-                Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11)),
+                SizedBox(
+                  height: Platform.isAndroid ? 34 : 28,
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: Platform.isAndroid ? 9 : 11),
+                  ),
+                ),
                 if (it['rating'] != null)
-                  Text('★ ${it['rating']}',
-                      style: const TextStyle(fontSize: 10, color: Colors.amber)),
+                  SizedBox(
+                    height: Platform.isAndroid ? 16 : 14,
+                    child: Text(
+                      '★ ${it['rating']}',
+                      style: TextStyle(
+                        fontSize: Platform.isAndroid ? 9 : 10,
+                        color: Colors.amber,
+                      ),
+                    ),
+                  ),
               ],
             ],
           ),
