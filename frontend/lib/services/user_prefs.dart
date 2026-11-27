@@ -11,6 +11,8 @@ class UserPrefs {
   final Map<String, int> myRatings = {};
   final Map<String, String> myNotes = {};
   final Set<String> favoriteChannels = {};
+  final Set<String> hiddenChannels = {};
+  final Set<String> hiddenCategories = {};
 
   static String get _path =>
       '${Platform.environment['HOME'] ?? '.'}/.flixam_player_prefs.json';
@@ -51,6 +53,12 @@ class UserPrefs {
         for (final v in (map['favoriteChannels'] as List?) ?? []) {
           favoriteChannels.add(v.toString());
         }
+        for (final v in (map['hiddenChannels'] as List?) ?? []) {
+          hiddenChannels.add(v.toString());
+        }
+        for (final v in (map['hiddenCategories'] as List?) ?? []) {
+          hiddenCategories.add(v.toString());
+        }
       }
     } catch (_) {}
   }
@@ -70,6 +78,22 @@ class UserPrefs {
   int ratingFor(String title) => myRatings[title] ?? 0;
 
   bool isFavoriteChannel(String title) => favoriteChannels.contains(title);
+
+  bool isChannelHidden(String title) => hiddenChannels.contains(title);
+
+  Future<void> toggleHiddenChannel(String title) async {
+    if (!hiddenChannels.remove(title)) hiddenChannels.add(title);
+    await _save();
+  }
+
+  bool isCategoryHidden(int index) =>
+      hiddenCategories.contains(index.toString());
+
+  Future<void> toggleHiddenCategory(int index) async {
+    final key = index.toString();
+    if (!hiddenCategories.remove(key)) hiddenCategories.add(key);
+    await _save();
+  }
 
   Future<void> toggleFavoriteChannel(String title) async {
     if (!favoriteChannels.remove(title)) favoriteChannels.add(title);
@@ -129,6 +153,8 @@ class UserPrefs {
         'myRatings': myRatings,
         'myNotes': myNotes,
         'favoriteChannels': favoriteChannels.toList(),
+        'hiddenChannels': hiddenChannels.toList(),
+        'hiddenCategories': hiddenCategories.toList(),
       }));
     } catch (_) {}
   }

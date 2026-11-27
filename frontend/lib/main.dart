@@ -2110,6 +2110,7 @@ class _HomePageState extends State<HomePage> {
   static const List<String> liveCategories = [
     'Alle', 'Favoriten', 'Öffentlich-rechtlich', 'Sky', 'Sport', 'Filme',
     'Dokumentar', 'Nachrichten', 'Kinder', 'Musik', 'Sonstige',
+    'Ausgeblendet',
   ];
 
   int _channelCategory(String title) {
@@ -2251,11 +2252,32 @@ class _HomePageState extends State<HomePage> {
           runSpacing: 4,
           children: [
             for (var i = 0; i < liveCategories.length; i++)
-              ChoiceChip(
-                label: Text(liveCategories[i],
-                    style: const TextStyle(fontSize: 10)),
+              GestureDetector(
+                onLongPress: i >= 2
+                    ? () async {
+                        await prefs.toggleHiddenCategory(i);
+                        if (mounted) setState(() {});
+                      }
+                    : null,
+                child: ChoiceChip(
+                label: Text(
+                  liveCategories[i],
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: prefs.isCategoryHidden(i) ? Colors.redAccent : null,
+                    decoration: prefs.isCategoryHidden(i)
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
                 selected: liveCategory == i,
-                onSelected: (_) => setState(() => liveCategory = i),
+                tooltip: i >= 2
+                    ? 'Langdruck: ${liveCategories[i]} aus-/einblenden'
+                    : null,
+                onSelected: (_) async {
+                  setState(() => liveCategory = i);
+                },
+              ),
               ),
           ],
         ),
@@ -2274,9 +2296,14 @@ class _HomePageState extends State<HomePage> {
     final channels = liveChannels.where((c) {
       final title = c['title']?.toString() ?? '';
       if (q.isNotEmpty && !title.toLowerCase().contains(q)) return false;
+      final hidden = prefs.isChannelHidden(title);
+      if (liveCategory == 11) return hidden;
+      if (hidden) return false;
+      final cat = _channelCategory(title);
+      if (prefs.isCategoryHidden(cat)) return false;
       if (liveCategory == 1) return prefs.isFavoriteChannel(title);
       if (liveCategory == 0) return true;
-      return _channelCategory(title) == liveCategory;
+      return cat == liveCategory;
     }).toList();
     if (channels.isEmpty) {
       list.add(const SliverToBoxAdapter(
@@ -2301,6 +2328,10 @@ class _HomePageState extends State<HomePage> {
             final title = channels[i]['title']?.toString() ?? '';
             return InkWell(
               onTap: () => _play(channels[i]['url']?.toString() ?? '', title),
+              onLongPress: () async {
+                await prefs.toggleHiddenChannel(title);
+                if (mounted) setState(() {});
+              },
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -2310,7 +2341,15 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.live_tv, size: 18, color: accent(context)),
+                    Icon(
+                      prefs.isChannelHidden(title)
+                          ? Icons.visibility_off
+                          : Icons.live_tv,
+                      size: 18,
+                      color: prefs.isChannelHidden(title)
+                          ? Colors.redAccent
+                          : accent(context),
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
