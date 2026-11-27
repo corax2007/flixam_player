@@ -95,7 +95,7 @@ import urllib.request
 urllib.request.install_opener(urllib.request.build_opener(urllib.request.ProxyHandler({})))
 
 from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -265,6 +265,36 @@ def _art_url(value: str) -> str:
     except Exception:
         pass
     return v
+
+
+@app.get("/art/proxy")
+def art_proxy(url: str = Query("")):
+    """Externe Cover mit Browser-Headers laden (Hotlink-Schutz umgehen)."""
+    if not url.startswith(("http://", "https://")):
+        return Response(status_code=404)
+    try:
+        parts = urlsplit(url)
+        referer = f"{parts.scheme}://{parts.netloc}/"
+        r = requests.get(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/148.0 Safari/537.36"
+                ),
+                "Referer": referer,
+                "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            },
+            timeout=15,
+        )
+        if r.status_code != 200 or not r.content:
+            return Response(status_code=404)
+        return Response(
+            content=r.content,
+            media_type=r.headers.get("content-type") or "image/jpeg",
+        )
+    except Exception:
+        return Response(status_code=404)
 
 
 @app.get("/art/{path:path}")
@@ -592,10 +622,15 @@ def addon_catalog(site: str = Query(""), type: str = Query("movie"),
             continue
         seen.add(key)
         year = str(it.get("year") or it.get("sYear") or "") or None
+        art = it.get("art") if isinstance(it.get("art"), dict) else {}
+        poster = str(art.get("thumb") or art.get("poster")
+                     or it.get("thumb") or it.get("trumb") or "")
+        if not poster and "trumb=" in item_url:
+            poster = unquote_plus(item_url.split("trumb=", 1)[1].split("&", 1)[0])
         out.append({
             "title": title,
             "year": year,
-            "poster_url": str(it.get("thumb") or it.get("trumb") or ""),
+            "poster_url": poster,
             "url": str(it.get("url") or ""),
             "media_type": type,
             "source": site,

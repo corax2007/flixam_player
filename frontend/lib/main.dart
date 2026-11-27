@@ -103,6 +103,7 @@ class _HomePageState extends State<HomePage> {
   bool showSourceEpisodes = false;
   bool showProviderNew = false;
   bool providerNewLoading = false;
+  bool showViewPanel = false;
   bool showAddonCatalog = false;
   bool addonCatalogLoading = false;
   List<dynamic> addonSites = [];
@@ -2214,7 +2215,18 @@ class _HomePageState extends State<HomePage> {
       ));
       return list;
     }
-    final items = _availabilityFiltered(_langFiltered(addonCatalogItems));
+    var items = _availabilityFiltered(_langFiltered(addonCatalogItems));
+    if (!api.useDirect) {
+      items = items.map((m) {
+        final copy = Map<String, dynamic>.from(m as Map);
+        final poster = copy['poster_url']?.toString() ?? '';
+        if (poster.startsWith('http')) {
+          copy['poster_url'] =
+              '${api.baseUrl}/art/proxy?url=${Uri.encodeComponent(poster)}';
+        }
+        return copy;
+      }).toList();
+    }
     list.add(SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       sliver: SliverGrid(
@@ -2404,7 +2416,7 @@ class _HomePageState extends State<HomePage> {
       } else {
         list.add(SliverToBoxAdapter(
           child: SizedBox(
-            height: 206,
+            height: _viewRowHeight(),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2993,10 +3005,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Eine Kachel fuer die Home-Reihen (horizontal oder im auf geklappten Raster).
+  double _viewCardWidth() {
+    switch (appSettings.viewMode) {
+      case 1: return 140;
+      case 2: case 9: return 240;
+      case 4: return 190;
+      case 6: return 180;
+      case 7: return 140;
+      case 10: return 110;
+      case 11: return 70;
+      case 12: return 100;
+      case 13: return 90;
+      case 14: return 160;
+      default: return 120;
+    }
+  }
+
+  double _viewPosterHeight() {
+    switch (appSettings.viewMode) {
+      case 1: return 110;
+      case 2: case 9: return 135;
+      case 3: return 150;
+      case 4: return 250;
+      case 5: return 90;
+      case 6: return 240;
+      case 7: return 170;
+      case 11: return 70;
+      case 12: return 150;
+      case 13: return 130;
+      case 14: return 220;
+      default: return 160;
+    }
+  }
+
+  bool _viewWide() => [1, 2, 9].contains(appSettings.viewMode);
+  bool _viewMinimal() => [5, 11].contains(appSettings.viewMode);
+  double _viewRowHeight() => _viewPosterHeight() + 46;
+
   Widget _homeItemCard(Map<String, dynamic> it, {bool autofocus = false}) {
-    final poster = it['poster_url']?.toString() ?? '';
+    final backdrop = it['backdrop_url']?.toString() ?? '';
+    final poster = _viewWide() && backdrop.isNotEmpty
+        ? backdrop
+        : it['poster_url']?.toString() ?? '';
     final label = it['title']?.toString() ?? '';
     final avail = _availableBadge(it);
+    final cardWidth = _viewCardWidth();
+    final posterHeight = _viewPosterHeight();
     return TvFocusable(
       autofocus: autofocus,
       onTap: () {
@@ -3019,7 +3073,7 @@ class _HomePageState extends State<HomePage> {
               : null,
         ),
         child: SizedBox(
-          width: 120,
+          width: cardWidth,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -3028,8 +3082,8 @@ class _HomePageState extends State<HomePage> {
                 child: Stack(
                   children: [
                     SizedBox(
-                      height: 160,
-                      width: 120,
+                      height: posterHeight,
+                      width: cardWidth,
                       child: poster.isNotEmpty
                           ? Image.network(
                               poster,
@@ -3091,12 +3145,14 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11)),
-              if (it['rating'] != null)
-                Text('★ ${it['rating']}',
-                    style: const TextStyle(fontSize: 10, color: Colors.amber)),
+              if (!_viewMinimal()) ...[
+                const SizedBox(height: 4),
+                Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11)),
+                if (it['rating'] != null)
+                  Text('★ ${it['rating']}',
+                      style: const TextStyle(fontSize: 10, color: Colors.amber)),
+              ],
             ],
           ),
         ),
@@ -3479,7 +3535,7 @@ class _HomePageState extends State<HomePage> {
       } else {
         list.add(SliverToBoxAdapter(
           child: SizedBox(
-            height: 206,
+            height: _viewRowHeight(),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -3494,6 +3550,68 @@ class _HomePageState extends State<HomePage> {
       }
     }
     return list;
+  }
+
+  void _selectViewMode(int index) async {
+    setState(() => appSettings.viewMode = index);
+    await appSettings.save();
+  }
+
+  Widget _viewPanel() {
+    return Container(
+      width: 220,
+      color: surf(context).withValues(alpha: 0.96),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 56,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'ANSICHT AUSWÄHLEN',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Schließen',
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => setState(() => showViewPanel = false),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: flixamViewModes.length,
+              itemBuilder: (ctx, i) {
+                final selected = appSettings.viewMode == i;
+                return ListTile(
+                  dense: true,
+                  selected: selected,
+                  selectedTileColor: accent(context).withValues(alpha: 0.18),
+                  title: Text(
+                    flixamViewModes[i],
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: selected ? accent(context) : Colors.white70,
+                    ),
+                  ),
+                  onTap: () => _selectViewMode(i),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _aetherNavItem(
@@ -3599,6 +3717,15 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Ansicht auswählen',
+                  icon: const Icon(Icons.view_agenda_outlined, size: 18),
+                  color: Colors.white70,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () =>
+                      setState(() => showViewPanel = !showViewPanel),
                 ),
                 IconButton(
                   tooltip: 'Kategorien aktualisieren',
@@ -4070,6 +4197,13 @@ class _HomePageState extends State<HomePage> {
             )
           else
             _buildContentScroller(),
+          if (showViewPanel && !showPlayer)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: _viewPanel(),
+            ),
           if (showPlayer)
             Positioned.fill(
               child: Container(

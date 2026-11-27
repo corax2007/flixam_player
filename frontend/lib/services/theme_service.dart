@@ -156,3 +156,22 @@ const List<FlixamLayout> flixamLayouts = [
   FlixamLayout('Klassisch', 'Kopfzeile oben'),
   FlixamLayout('Aether', 'Seitenleiste links'),
 ];
+
+/// Ansichts-Modi für die Cover-Reihen (rechtes Auswahl-Panel).
+const List<String> flixamViewModes = [
+  'Liste',
+  'Rechte Liste',
+  'Fanartliste',
+  'ListeUnten',
+  'GroßeListe',
+  'Logo',
+  'SchauKasten',
+  'Shift',
+  'Poster',
+  'MyFlix',
+  'Tri-Panel',
+  'Symbole',
+  'Wand',
+  'Vollbildwand',
+  'InfoWand',
+];
