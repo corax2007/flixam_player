@@ -142,7 +142,7 @@ class ApiService {
     return (j['providers'] as List?) ?? [];
   }
 
-  Future<List<dynamic>> seriesNetworkItems(int id, {int limit = 60}) async {
+  Future<List<dynamic>> seriesNetworkItems(int id, {int limit = 200}) async {
     if (useDirect) {
       return (await TmdbService.instance.seriesNetworkItems(id, limit: limit))
           .cast<dynamic>();

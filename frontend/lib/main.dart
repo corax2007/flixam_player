@@ -1437,7 +1437,7 @@ class _HomePageState extends State<HomePage> {
     });
     if (!_seriesMoreItems.containsKey(id)) {
       try {
-        final items = await api.seriesNetworkItems(id, limit: 60);
+        final items = await api.seriesNetworkItems(id, limit: 200);
         if (mounted) setState(() => _seriesMoreItems[id] = items);
       } catch (_) {}
     }

@@ -912,28 +912,35 @@ def tmdb_series_network(id: str = Query(""), limit: int = 60):
     out = []
     seen = set()
     from datetime import date as _date
-    for page in (1, 2):
-        data = _tmdb_get("discover/tv", {
-            "with_networks": id,
-            "sort_by": "first_air_date.desc",
-            "page": page,
-        }) or {}
-        results = data.get("results") or []
-        if not results:
-            break
-        for r in results:
-            item = _tmdb_to_item(r, "tv")
-            if not item or not item.get("title") or not item.get("poster_url"):
-                continue
-            try:
-                if int(item.get("year") or 9999) > _date.today().year:
+    # Zwei Sortierungen kombinieren: neueste AND bekannte Originale,
+    # sonst fehlen Titel, die nur auf spaeteren Datum-Seiten liegen.
+    for sort_by, pages in (("first_air_date.desc", 10), ("popularity.desc", 5)):
+        for page in range(1, pages + 1):
+            data = _tmdb_get("discover/tv", {
+                "with_networks": id,
+                "sort_by": sort_by,
+                "page": page,
+            }) or {}
+            results = data.get("results") or []
+            if not results:
+                break
+            for r in results:
+                item = _tmdb_to_item(r, "tv")
+                if not item or not item.get("title") or not item.get("poster_url"):
                     continue
-            except (TypeError, ValueError):
-                continue
-            if item["title"] not in seen:
-                seen.add(item["title"])
-                out.append(item)
-        if len(out) >= limit or page >= min(int(data.get("total_pages") or 1), 2):
+                try:
+                    if int(item.get("year") or 9999) > _date.today().year:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                if item["title"] not in seen:
+                    seen.add(item["title"])
+                    out.append(item)
+            if len(out) >= limit:
+                break
+            if page >= min(int(data.get("total_pages") or 1), pages):
+                break
+        if len(out) >= limit:
             break
     out = out[:limit]
     _TMDB_CACHE[cache_key] = out
