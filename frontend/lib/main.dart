@@ -107,6 +107,8 @@ class _HomePageState extends State<HomePage> {
   bool liveLoading = false;
   List<dynamic> liveChannels = [];
   int liveCategory = 0;
+  bool liveMultiSelect = false;
+  final Set<String> liveSelected = {};
   final TextEditingController liveSearchCtrl = TextEditingController();
   bool showViewPanel = false;
   final Map<String, Map<String, dynamic>> _listPreviewBySection = {};
@@ -2194,6 +2196,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  List<dynamic> _filteredLiveChannels() {
+    final q = liveSearchCtrl.text.trim().toLowerCase();
+    return liveChannels.where((c) {
+      final title = c['title']?.toString() ?? '';
+      if (q.isNotEmpty && !title.toLowerCase().contains(q)) return false;
+      final hidden = prefs.isChannelHidden(title);
+      if (liveCategory == 11) return hidden;
+      if (hidden) return false;
+      final cat = _channelCategory(title);
+      if (prefs.isCategoryHidden(cat)) return false;
+      if (liveCategory == 1) return prefs.isFavoriteChannel(title);
+      if (liveCategory == 0) return true;
+      return cat == liveCategory;
+    }).toList();
+  }
+
   List<Widget> _buildLiveTvSlivers() {
     final list = <Widget>[
       SliverToBoxAdapter(
@@ -2209,6 +2227,16 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               IconButton(
+                tooltip: liveMultiSelect ? 'Auswahl beenden' : 'Mehrfachauswahl',
+                icon: Icon(liveMultiSelect
+                    ? Icons.checklist
+                    : Icons.checklist_outlined),
+                onPressed: () => setState(() {
+                  liveMultiSelect = !liveMultiSelect;
+                  liveSelected.clear();
+                }),
+              ),
+              IconButton(
                 tooltip: 'Schließen',
                 icon: const Icon(Icons.close),
                 onPressed: () => setState(() => showLiveTv = false),
@@ -2218,6 +2246,45 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     ];
+    if (liveMultiSelect) {
+      list.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              Text('Auswahl: ${liveSelected.length}',
+                  style: const TextStyle(fontSize: 12)),
+              ActionChip(
+                label: const Text('Alle auswählen'),
+                onPressed: () => setState(() {
+                  liveSelected.addAll(
+                    _filteredLiveChannels()
+                        .map((c) => c['title']?.toString() ?? ''),
+                  );
+                }),
+              ),
+              ActionChip(
+                label: const Text('Zu Favoriten'),
+                onPressed: () async {
+                  await prefs.addFavoriteChannels(liveSelected);
+                  if (!mounted) return;
+                  setState(() {
+                    liveCategory = 1;
+                    liveMultiSelect = false;
+                    liveSelected.clear();
+                  });
+                },
+              ),
+              ActionChip(
+                label: const Text('Auswahl leeren'),
+                onPressed: () => setState(() => liveSelected.clear()),
+              ),
+            ],
+          ),
+        ),
+      ));
+    }
     if (Platform.isAndroid) {
       list.add(const SliverToBoxAdapter(
         child: Padding(
@@ -2292,19 +2359,7 @@ class _HomePageState extends State<HomePage> {
       ));
       return list;
     }
-    final q = liveSearchCtrl.text.trim().toLowerCase();
-    final channels = liveChannels.where((c) {
-      final title = c['title']?.toString() ?? '';
-      if (q.isNotEmpty && !title.toLowerCase().contains(q)) return false;
-      final hidden = prefs.isChannelHidden(title);
-      if (liveCategory == 11) return hidden;
-      if (hidden) return false;
-      final cat = _channelCategory(title);
-      if (prefs.isCategoryHidden(cat)) return false;
-      if (liveCategory == 1) return prefs.isFavoriteChannel(title);
-      if (liveCategory == 0) return true;
-      return cat == liveCategory;
-    }).toList();
+    final channels = _filteredLiveChannels();
     if (channels.isEmpty) {
       list.add(const SliverToBoxAdapter(
         child: Padding(
@@ -2327,7 +2382,15 @@ class _HomePageState extends State<HomePage> {
           (ctx, i) {
             final title = channels[i]['title']?.toString() ?? '';
             return InkWell(
-              onTap: () => _play(channels[i]['url']?.toString() ?? '', title),
+              onTap: () {
+                if (liveMultiSelect) {
+                  setState(() {
+                    if (!liveSelected.remove(title)) liveSelected.add(title);
+                  });
+                } else {
+                  _play(channels[i]['url']?.toString() ?? '', title);
+                }
+              },
               onLongPress: () async {
                 await prefs.toggleHiddenChannel(title);
                 if (mounted) setState(() {});
@@ -2341,6 +2404,17 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Row(
                   children: [
+                    if (liveMultiSelect)
+                      Icon(
+                        liveSelected.contains(title)
+                            ? Icons.check_box
+                            : Icons.check_box_outline_blank,
+                        size: 16,
+                        color: liveSelected.contains(title)
+                            ? accent(context)
+                            : Colors.white54,
+                      ),
+                    if (!liveMultiSelect)
                     Icon(
                       prefs.isChannelHidden(title)
                           ? Icons.visibility_off

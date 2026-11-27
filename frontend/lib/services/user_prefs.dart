@@ -99,6 +99,11 @@ class UserPrefs {
     if (!favoriteChannels.remove(title)) favoriteChannels.add(title);
     await _save();
   }
+
+  Future<void> addFavoriteChannels(Iterable<String> titles) async {
+    favoriteChannels.addAll(titles);
+    await _save();
+  }
   String noteFor(String title) => myNotes[title] ?? '';
 
   Future<void> setRating(String title, int rating) async {
