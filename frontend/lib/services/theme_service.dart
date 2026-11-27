@@ -144,3 +144,15 @@ ThemeData flixamTheme(int index) {
 Color bg(BuildContext context) => Theme.of(context).scaffoldBackgroundColor;
 Color surf(BuildContext context) => Theme.of(context).colorScheme.surface;
 Color accent(BuildContext context) => Theme.of(context).colorScheme.primary;
+
+/// Layout-Presets. 0 = bisherige Kopfzeile, 1 = Aether mit Seitenleiste.
+class FlixamLayout {
+  final String name;
+  final String description;
+  const FlixamLayout(this.name, this.description);
+}
+
+const List<FlixamLayout> flixamLayouts = [
+  FlixamLayout('Klassisch', 'Kopfzeile oben'),
+  FlixamLayout('Aether', 'Seitenleiste links'),
+];

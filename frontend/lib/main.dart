@@ -787,6 +787,72 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _layoutPreview(int index, {required bool selected}) {
+    final d = designAt(appSettings.design);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: d.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? d.accent : Colors.white24,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: index == 0
+              ? Column(
+                  children: [
+                    Container(height: 12, width: double.infinity, color: d.surface),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: Container(color: d.accent.withValues(alpha: 0.5))),
+                            const SizedBox(width: 3),
+                            Expanded(child: Container(color: d.surface)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Container(width: 12, color: d.surface,
+                        child: Column(
+                          children: [
+                            Container(height: 4, width: 4, color: d.accent),
+                            const SizedBox(height: 3),
+                            Container(height: 2, width: 6, color: Colors.white38),
+                            const SizedBox(height: 2),
+                            Container(height: 2, width: 6, color: Colors.white38),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Container(color: d.accent.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          flixamLayouts[index].name,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 9, color: selected ? d.accent : Colors.white70),
+        ),
+      ],
+    );
+  }
+
   Widget _designPreview(FlixamDesign d, {required bool selected}) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -877,12 +943,34 @@ class _HomePageState extends State<HomePage> {
                 },
               },
               child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                      const Text('Layout',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          for (var i = 0; i < flixamLayouts.length; i++) ...[
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () async {
+                                  setState(() => appSettings.layout = i);
+                                  await appSettings.save();
+                                  setState(() {});
+                                },
+                                child: _layoutPreview(i, selected: appSettings.layout == i),
+                              ),
+                            ),
+                            if (i < flixamLayouts.length - 1) const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       const Text('Design',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 8),
@@ -1061,7 +1149,8 @@ class _HomePageState extends State<HomePage> {
                         },
                         child: const Text('Eigene Quellen neu laden'),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1452,13 +1541,29 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       eyebrow,
                       style: TextStyle(
-                        color: accent(context), fontSize: 12, fontWeight: FontWeight.bold,
+                        color: appSettings.layout == 1
+                            ? Colors.white54
+                            : accent(context),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: appSettings.layout == 1 ? 2 : 0,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       title,
-                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, height: 1.05),
+                      style: appSettings.layout == 1
+                          ? const TextStyle(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w300,
+                              letterSpacing: 3,
+                              height: 1.05,
+                            )
+                          : const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              height: 1.05,
+                            ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -2246,16 +2351,175 @@ class _HomePageState extends State<HomePage> {
     return list;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FocusTraversalGroup(
-      policy: ReadingOrderTraversalPolicy(),
-      child: Scaffold(
-        body: Stack(
+  Widget _aetherNavItem(
+    IconData icon,
+    String label, {
+    required bool active,
+    VoidCallback? onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: active ? surf(context) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: active ? Colors.white : Colors.white60),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: active ? Colors.white : Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _aetherSidebar() {
+    final d = designAt(appSettings.design);
+    return Container(
+      width: 210,
+      color: d.background,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (Platform.isAndroid) BrowserResolver.instance.buildHiddenView(),
-          CustomScrollView(
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Icon(Icons.movie_filter_outlined, color: d.accent, size: 22),
+                const SizedBox(width: 8),
+                const Text(
+                  'AETHER',
+                  style: TextStyle(
+                    fontSize: 15,
+                    letterSpacing: 3,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: TextField(
+              controller: searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Suche...',
+                isDense: true,
+                prefixIcon: const Icon(Icons.search, size: 16),
+                fillColor: surf(context),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onSubmitted: (_) => _search(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _aetherNavItem(Icons.home_outlined, 'Home',
+              active: showHome, onTap: _goHome),
+          _aetherNavItem(Icons.search, 'Suche',
+              active: false, onTap: () => _search()),
+          _aetherNavItem(Icons.movie_outlined, 'Filme',
+              active: !showHome && !showFavorites, onTap: _browseRoot),
+          _aetherNavItem(Icons.favorite_border, 'Favoriten', active: showFavorites,
+              onTap: () => setState(() {
+                    showFavorites = !showFavorites;
+                    showHome = false;
+                    heroItem = null;
+                  })),
+          if (!Platform.isAndroid)
+            _aetherNavItem(Icons.file_download_outlined, 'Import',
+                active: false, onTap: _importConf),
+          _aetherNavItem(Icons.settings_outlined, 'Einstellungen',
+              active: false, onTap: _showSettings),
+          const Spacer(),
+          if (!Platform.isAndroid)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(Icons.circle, size: 8,
+                      color: vpnActive ? Colors.green : Colors.white24),
+                  const SizedBox(width: 6),
+                  Text('VPN',
+                      style: TextStyle(fontSize: 10, color: Colors.white54)),
+                  const Spacer(),
+                  for (final a in ['xstream', 'xship'])
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: InkWell(
+                        onTap: () => setState(() => addon = a),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: addon == a ? d.accent : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Text(
+                            a == 'xstream' ? 'xS' : 'xSh',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: addon == a ? Colors.black : Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.white24),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const CircleAvatar(
+                    radius: 12,
+                    child: Icon(Icons.person, size: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text('Profil',
+                        style: TextStyle(fontSize: 12, color: Colors.white)),
+                  ),
+                  Icon(Icons.expand_more, size: 14, color: Colors.white54),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentScroller() {
+    return CustomScrollView(
             slivers: [
+              if (appSettings.layout != 1) ...[
               SliverAppBar(
                 pinned: true,
                 backgroundColor: Colors.transparent,
@@ -2379,7 +2643,8 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
-              ),
+              )
+              ],
               if (!Platform.isAndroid && !_wgConfigured())
                 SliverToBoxAdapter(
                   child: Container(
@@ -2692,7 +2957,28 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ],
-          ),
+          );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FocusTraversalGroup(
+      policy: ReadingOrderTraversalPolicy(),
+      child: Scaffold(
+        body: Stack(
+        children: [
+          if (Platform.isAndroid) BrowserResolver.instance.buildHiddenView(),
+          if (appSettings.layout == 1 && !Platform.isAndroid)
+            Positioned.fill(
+              child: Row(
+                children: [
+                  _aetherSidebar(),
+                  Expanded(child: _buildContentScroller()),
+                ],
+              ),
+            )
+          else
+            _buildContentScroller(),
           if (showPlayer)
             Positioned.fill(
               child: Container(

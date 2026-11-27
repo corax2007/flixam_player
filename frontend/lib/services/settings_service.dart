@@ -10,6 +10,7 @@ class AppSettings {
   bool onlyAvailable;
   bool autoPlaySeason;
   int design;
+  int layout;
   String backendUrl;
 
   static const String defaultBackendUrl = String.fromEnvironment(
@@ -25,6 +26,7 @@ class AppSettings {
     this.onlyAvailable = true,
     this.autoPlaySeason = false,
     this.design = 0,
+    this.layout = 0,
     this.backendUrl = defaultBackendUrl,
   });
 
@@ -46,6 +48,7 @@ class AppSettings {
           onlyAvailable: map['onlyAvailable'] as bool? ?? true,
           autoPlaySeason: map['autoPlaySeason'] as bool? ?? false,
           design: val('design', 0),
+          layout: val('layout', 0),
           backendUrl: map['backendUrl']?.toString().isNotEmpty ?? false
               ? map['backendUrl'].toString()
               : defaultBackendUrl,
@@ -65,6 +68,7 @@ class AppSettings {
         'onlyAvailable': onlyAvailable,
         'autoPlaySeason': autoPlaySeason,
         'design': design,
+        'layout': layout,
         'backendUrl': backendUrl,
       }));
     } catch (_) {}

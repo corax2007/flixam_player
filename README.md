@@ -18,6 +18,9 @@ Wiedergabe-Fortschritt. Die Oberfläche ist auf Deutsch.
   Pause abspielen** (Einstellungen → Zahnrad)
 - **Player**: Fortsetzen, Suchleiste, +/-10 s, Lautstärke, Endzeit-Anzeige,
   automatisch ausgeblendete untere Steuerung, dauerhaft sichtbare obere Leiste
+- **Layouts**: umschaltbar in den Optionen – „Klassisch" (Kopfzeile) und
+  „Aether" (Seitenleiste links, eleganter Hero). Auf Android/Fire TV bleibt
+  aus Performance-/platzgründen „Klassisch" aktiv.
 - **Designs**: 5 auswählbare Looks (Klassisch, Mitternacht, Wald, Violett,
   Amber) mit Mini-Vorschau in den Optionen (Zahnrad)
 - **Persönlich**: Favoriten, 5-Sterne-Bewertung, Notizen/Schnell-Tags
