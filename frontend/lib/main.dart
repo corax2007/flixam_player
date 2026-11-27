@@ -1512,7 +1512,7 @@ class _HomePageState extends State<HomePage> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (backdrop.isNotEmpty)
+            if (backdrop.isNotEmpty && !aether)
                 Image.network(
                   backdrop,
                   fit: BoxFit.cover,
@@ -1521,22 +1521,7 @@ class _HomePageState extends State<HomePage> {
                   alignment: Alignment.topCenter,
                   errorBuilder: (_, _, _) => Container(color: surf(context)),
                 ),
-            if (aether)
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      bg(context).withValues(alpha: 0.22),
-                      bg(context).withValues(alpha: 0.24),
-                      bg(context).withValues(alpha: 0.04),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-              )
-            else
+            if (!aether)
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -1584,6 +1569,13 @@ class _HomePageState extends State<HomePage> {
                               fontWeight: FontWeight.w300,
                               letterSpacing: 3,
                               height: 1.05,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             )
                           : const TextStyle(
                               fontSize: 32,
@@ -2456,6 +2448,45 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Aether: Hero-Bild als vollflächige Seite im Hintergrund; Cover liegen
+  /// darüber. Ein dunkler Verlauf haelt Text und Karten lesbar.
+  Widget _aetherFullBackground() {
+    final selected = heroItem is Map
+        ? (heroItem as Map).cast<String, dynamic>()
+        : null;
+    final homeHero = (homeData?['hero'] as Map?)?.cast<String, dynamic>();
+    final item = selected ?? homeHero;
+    final backdrop = item?['backdrop_url']?.toString() ?? '';
+    if (backdrop.isEmpty) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            backdrop,
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  bg(context).withValues(alpha: 0.66),
+                  bg(context).withValues(alpha: 0.76),
+                  bg(context).withValues(alpha: 0.93),
+                ],
+                stops: const [0.0, 0.45, 1.0],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _aetherSidebar() {
     final d = designAt(appSettings.design);
     return SizedBox(
@@ -3066,6 +3097,7 @@ class _HomePageState extends State<HomePage> {
             Positioned.fill(
               child: Stack(
                 children: [
+                  _aetherFullBackground(),
                   _buildContentScroller(),
                   Positioned(
                     left: 0,
