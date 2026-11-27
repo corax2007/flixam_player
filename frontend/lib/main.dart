@@ -3312,6 +3312,30 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+              if (!showHome && heroItem != null && appSettings.heroInBrowse)
+                _heroBanner(
+                  (heroItem as Map).cast<String, dynamic>(),
+                  eyebrow: 'AUSGEWÄHLT',
+                  onClose: () => setState(() => heroItem = null),
+                  sources: heroSources,
+                  sourcesLoading: heroSourcesLoading,
+                  onSource: (url, label) =>
+                      _onHeroSource(url, label, heroItem),
+                  trailerKey: heroTrailerKey,
+                  onTrailer: heroTrailerKey == null
+                      ? null
+                      : () => _openTrailer(
+                          heroTrailerKey!,
+                          (heroItem as Map)['title']?.toString() ?? '',
+                        ),
+                  onResume: prefs.positionFor((heroItem as Map)['title']?.toString() ?? '') > 30
+                      ? () => _play((heroItem as Map)['url']?.toString() ?? '',
+                          (heroItem as Map)['title']?.toString() ?? '', resume: true)
+                      : null,
+                  resumeInfo: _resumeInfo((heroItem as Map)['title']?.toString() ?? ''),
+                  myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
+                  myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
+                ),
               if (showNewSeries) ..._buildNewSeriesSlivers(),
               if (showProviderNew) ..._buildProviderNewSlivers(),
               if (showFavorites) ..._buildFavoriteSlivers(),
@@ -3346,30 +3370,6 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                ),
-              if (!showHome && heroItem != null && appSettings.heroInBrowse)
-                _heroBanner(
-                  (heroItem as Map).cast<String, dynamic>(),
-                  eyebrow: 'AUSGEWÄHLT',
-                  onClose: () => setState(() => heroItem = null),
-                  sources: heroSources,
-                  sourcesLoading: heroSourcesLoading,
-                  onSource: (url, label) =>
-                      _onHeroSource(url, label, heroItem),
-                  trailerKey: heroTrailerKey,
-                  onTrailer: heroTrailerKey == null
-                      ? null
-                      : () => _openTrailer(
-                          heroTrailerKey!,
-                          (heroItem as Map)['title']?.toString() ?? '',
-                        ),
-                  onResume: prefs.positionFor((heroItem as Map)['title']?.toString() ?? '') > 30
-                      ? () => _play((heroItem as Map)['url']?.toString() ?? '',
-                          (heroItem as Map)['title']?.toString() ?? '', resume: true)
-                      : null,
-                  resumeInfo: _resumeInfo((heroItem as Map)['title']?.toString() ?? ''),
-                  myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
-                  myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
                 ),
               if (!showHome && !showFavorites && !showSourceEpisodes)
                 SliverPadding(
