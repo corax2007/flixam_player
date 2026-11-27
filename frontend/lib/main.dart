@@ -105,6 +105,9 @@ class _HomePageState extends State<HomePage> {
   bool showSourceEpisodes = false;
   bool showProviderNew = false;
   bool providerNewLoading = false;
+  bool showDownloads = false;
+  List<dynamic> downloadItems = [];
+  Timer? _downloadTimer;
   bool showLiveTv = false;
   bool liveLoading = false;
   List<dynamic> liveChannels = [];
@@ -371,6 +374,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _downloadTimer?.cancel();
     _autoRefreshTimer?.cancel();
     _controlsTimer?.cancel();
     _volumeSub?.cancel();
@@ -1746,6 +1750,8 @@ class _HomePageState extends State<HomePage> {
           child: Text(prefs.isFavorite(item) ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'),
         ),
         const PopupMenuItem(value: 'resume', child: Text('Ab hier wiedergeben')),
+        if (!Platform.isAndroid)
+          const PopupMenuItem(value: 'download', child: Text('Herunterladen')),
       ],
     );
     if (value == null || !mounted) return;
@@ -1814,6 +1820,25 @@ class _HomePageState extends State<HomePage> {
       case 'fav':
         await prefs.toggleFavorite(item);
         if (mounted) setState(() {});
+        break;
+      case 'download':
+        try {
+          final r = await api.startDownload(
+            item['url']?.toString() ?? '',
+            title,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  r['ok'] == true
+                      ? 'Download gestartet: $title'
+                      : 'Download fehlgeschlagen: ${r['error'] ?? ''}',
+                ),
+              ),
+            );
+          }
+        } catch (_) {}
         break;
       case 'resume':
         await _play(item['url']?.toString() ?? '', title);
@@ -2173,6 +2198,157 @@ class _HomePageState extends State<HomePage> {
     return 9;
   }
     return 10;
+  }
+
+  Future<void> _loadDownloads() async {
+    final items = await api.downloadStatus();
+    if (mounted) setState(() => downloadItems = items);
+  }
+
+  Future<void> _toggleDownloads() async {
+    if (showDownloads) {
+      _downloadTimer?.cancel();
+      _downloadTimer = null;
+      setState(() => showDownloads = false);
+      return;
+    }
+    setState(() {
+      showDownloads = true;
+      showHome = false;
+      showFavorites = false;
+      showProviderNew = false;
+      showNewSeries = false;
+      showAddonCatalog = false;
+      showLiveTv = false;
+      showSourceEpisodes = false;
+      heroItem = null;
+    });
+    await _loadDownloads();
+    _downloadTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted && showDownloads) _loadDownloads();
+    });
+  }
+
+  List<Widget> _buildDownloadsSlivers() {
+    final list = <Widget>[
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Downloads (${downloadItems.length})',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => _toggleDownloads(),
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(12, 0, 12, 6),
+          child: Text(
+            'Nur für Inhalte verwenden, die du legal abspeichern darfst.',
+            style: TextStyle(fontSize: 10, color: Colors.white54),
+          ),
+        ),
+      ),
+    ];
+    if (downloadItems.isEmpty) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Noch keine Downloads. Langdruck auf ein Cover → „Herunterladen".'),
+        ),
+      ));
+      return list;
+    }
+    list.add(SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (ctx, i) {
+          final d = downloadItems[i] as Map<String, dynamic>;
+          final key = d['key']?.toString() ?? '';
+          final title = d['title']?.toString() ?? key;
+          final status = d['status']?.toString() ?? '';
+          final progress = (d['progress'] as num?)?.toDouble() ?? 0;
+          return Card(
+            color: surf(context),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Text(status,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: status == 'done'
+                                ? Colors.green
+                                : Colors.white54,
+                          )),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: status == 'done' ? 1.0 : progress,
+                    minHeight: 3,
+                    color: accent(context),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (status == 'done')
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              _play(api.downloadUrl(key), title),
+                          icon: const Icon(Icons.play_arrow, size: 16),
+                          label: const Text('Abspielen'),
+                        ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Löschen',
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        onPressed: () async {
+                          await api.deleteDownload(key);
+                          await _loadDownloads();
+                        },
+                      ),
+                    ],
+                  ),
+                  if (d['error']?.toString().isNotEmpty ?? false)
+                    Text(
+                      d['error'].toString(),
+                      maxLines: 2,
+                      style: const TextStyle(
+                          fontSize: 9, color: Colors.redAccent),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+        childCount: downloadItems.length,
+      ),
+    ));
+    return list;
   }
 
   Future<void> _toggleLiveTv() async {
@@ -4311,6 +4487,9 @@ class _HomePageState extends State<HomePage> {
           _aetherNavItem(Icons.movie_outlined, 'Filme',
               active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showAddonCatalog && !showLiveTv && !showSourceEpisodes,
               onTap: _browseRoot),
+          if (!Platform.isAndroid)
+            _aetherNavItem(Icons.download_for_offline_outlined, 'Downloads',
+                active: showDownloads, onTap: _toggleDownloads),
           _aetherNavItem(Icons.live_tv, 'Live TV',
               active: showLiveTv, onTap: _toggleLiveTv),
           _aetherNavItem(Icons.storage, 'Addon-Bestand',
@@ -4571,6 +4750,7 @@ class _HomePageState extends State<HomePage> {
                   myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
                   myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
                 ),
+              if (showDownloads) ..._buildDownloadsSlivers(),
               if (showLiveTv) ..._buildLiveTvSlivers(),
               if (showAddonCatalog) ..._buildAddonCatalogSlivers(),
               if (showNewSeries) ..._buildNewSeriesSlivers(),

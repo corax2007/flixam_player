@@ -1846,6 +1846,137 @@ def _resolve_flixam_search_url(url: str) -> str:
     return candidates[0] if candidates else ""
 
 
+# --- Downloads (nur Linux-Desktop; ffmpeg lokal) ---------------------------
+DOWNLOAD_DIR = os.path.join(
+    os.path.dirname(BASE_DIR), "flixam_downloads"
+)
+_DOWNLOADS = {}
+_DOWNLOAD_LOCK = threading.Lock()
+
+
+def _download_name(title: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9ÄÖÜäöüß._ -]", "", title).strip()
+    safe = re.sub(r"\s+", " ", safe)[:120] or "download"
+    return safe + ".mp4"
+
+
+def _download_worker(key: str, stream_url: str, headers: dict) -> None:
+    path = os.path.join(DOWNLOAD_DIR, key)
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+    header_str = "&".join(f"{k}={v}" for k, v in (headers or {}).items())
+    if header_str:
+        cmd += ["-headers", header_str + "\r\n"]
+    cmd += [
+        "-i", stream_url,
+        "-c", "copy",
+        "-bsf:a", "aac_adtstoasc",
+        "-movflags", "+faststart",
+        "-progress", "pipe:1",
+        "-nostats",
+        path,
+    ]
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        duration = 0.0
+        try:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries",
+                 "format=duration", "-of", "csv=p=0", stream_url],
+                capture_output=True, text=True, timeout=30,
+            )
+            duration = float((probe.stdout or "0").strip() or 0)
+        except Exception:
+            pass
+        for line in proc.stdout or []:
+            line = line.strip()
+            if line.startswith("out_time_ms="):
+                try:
+                    elapsed = int(line.split("=", 1)[1]) / 1_000_000
+                    with _DOWNLOAD_LOCK:
+                        _DOWNLOADS[key]["elapsed"] = elapsed
+                        if duration > 0:
+                            _DOWNLOADS[key]["progress"] = min(
+                                0.99, elapsed / duration
+                            )
+                except (ValueError, TypeError):
+                    pass
+        code = proc.wait(timeout=7200)
+        with _DOWNLOAD_LOCK:
+            _DOWNLOADS[key]["progress"] = 1.0 if code == 0 else 0.0
+            _DOWNLOADS[key]["status"] = "done" if code == 0 else "error"
+            if code != 0:
+                _DOWNLOADS[key]["error"] = (
+                    (proc.stderr.read() or "")[-400:]
+                )
+    except Exception as e:
+        with _DOWNLOAD_LOCK:
+            _DOWNLOADS[key]["status"] = "error"
+            _DOWNLOADS[key]["error"] = str(e)[:400]
+
+
+@app.post("/download/start")
+def download_start(body: dict):
+    url = (body.get("url", "") or "").strip()
+    title = (body.get("title", "") or "").strip() or "Download"
+    if not url:
+        return {"ok": False, "error": "Keine URL"}
+    resolved = resolve({"url": url})
+    stream_url = resolved.get("stream_url") or ""
+    if not stream_url:
+        return {"ok": False, "error": "Kein Stream gefunden"}
+    key = _download_name(title)
+    with _DOWNLOAD_LOCK:
+        if key in _DOWNLOADS and _DOWNLOADS[key]["status"] == "running":
+            return {"ok": True, "key": key, "already": True}
+        _DOWNLOADS[key] = {
+            "title": title,
+            "key": key,
+            "status": "running",
+            "progress": 0.0,
+            "elapsed": 0.0,
+            "error": "",
+        }
+    t = threading.Thread(
+        target=_download_worker,
+        args=(key, stream_url, resolved.get("headers") or {}),
+        daemon=True,
+    )
+    t.start()
+    return {"ok": True, "key": key}
+
+
+@app.get("/download/status")
+def download_status():
+    with _DOWNLOAD_LOCK:
+        return {"items": [dict(v) for v in _DOWNLOADS.values()]}
+
+
+@app.get("/download/file/{name}")
+def download_file(name: str):
+    target = os.path.realpath(os.path.join(DOWNLOAD_DIR, name))
+    if not target.startswith(os.path.realpath(DOWNLOAD_DIR) + os.sep):
+        return {"detail": "not found"}
+    if not os.path.isfile(target):
+        return {"detail": "not found"}
+    return FileResponse(target, media_type="video/mp4")
+
+
+@app.delete("/download/{name}")
+def download_delete(name: str):
+    target = os.path.realpath(os.path.join(DOWNLOAD_DIR, name))
+    if target.startswith(os.path.realpath(DOWNLOAD_DIR) + os.sep):
+        try:
+            os.remove(target)
+        except OSError:
+            pass
+    with _DOWNLOAD_LOCK:
+        _DOWNLOADS.pop(name, None)
+    return {"ok": True}
+
+
 @app.post("/resolve")
 def resolve(body: dict):
     url = (body.get("url", "") or "").strip()

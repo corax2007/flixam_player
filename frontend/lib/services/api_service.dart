@@ -48,6 +48,47 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> startDownload(
+    String url,
+    String title,
+  ) async {
+    if (useDirect) return {'ok': false, 'error': 'Nur auf Linux verfügbar'};
+    try {
+      final r = await http.post(
+        Uri.parse('$baseUrl/download/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'url': url, 'title': title}),
+      ).timeout(const Duration(seconds: 60));
+      return jsonDecode(r.body) as Map<String, dynamic>;
+    } catch (_) {
+      return {'ok': false, 'error': 'Download nicht gestartet'};
+    }
+  }
+
+  Future<List<dynamic>> downloadStatus() async {
+    if (useDirect) return [];
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/download/status'))
+          .timeout(const Duration(seconds: 20));
+      final j = jsonDecode(r.body) as Map<String, dynamic>;
+      return (j['items'] as List?) ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> deleteDownload(String key) async {
+    if (useDirect) return;
+    try {
+      await http
+          .delete(Uri.parse('$baseUrl/download/${Uri.encodeComponent(key)}'))
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {}
+  }
+
+  String downloadUrl(String key) =>
+      '$baseUrl/download/file/${Uri.encodeComponent(key)}';
+
   Future<Map<String, dynamic>> vavooProgramInfo(String title) async {
     if (useDirect) return {};
     try {
