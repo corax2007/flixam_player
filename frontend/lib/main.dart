@@ -106,6 +106,7 @@ class _HomePageState extends State<HomePage> {
   bool showLiveTv = false;
   bool liveLoading = false;
   List<dynamic> liveChannels = [];
+  int liveCategory = 0;
   final TextEditingController liveSearchCtrl = TextEditingController();
   bool showViewPanel = false;
   final Map<String, Map<String, dynamic>> _listPreviewBySection = {};
@@ -2106,6 +2107,65 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  static const List<String> liveCategories = [
+    'Alle', 'Favoriten', 'Öffentlich-rechtlich', 'Sky', 'Sport', 'Filme',
+    'Dokumentar', 'Nachrichten', 'Kinder', 'Musik', 'Sonstige',
+  ];
+
+  int _channelCategory(String title) {
+    final t = title.toLowerCase();
+    bool has(List<String> words) => words.any(t.contains);
+    if (has(['sky'])) {
+    return 3;
+  }
+    if (has([
+      'ard', 'zdf', 'orf', 'srf', '3sat', 'arte', 'kika', 'wdr', 'ndr',
+      'swr', 'mdr', 'rbb', 'deutschlandfunk', 'phoenix', 'zdfinfo',
+      'tagesschau', 'srv', 'rts', 'vrt', 'npo', 'brav'
+    ])) {
+    return 2;
+  }
+    if (has([
+      'sport', 'eurosport', 'dazn', 'wwe', 'fight', 'golf', 'tennis',
+      'fussball', 'fußball', 'bundesliga', 'uefa', 'olympia',
+      'motorsport', 'formula', 'nfl', 'nba', 'hockey', 'boxen',
+      'sportdeutschland', 'sportschau'
+    ])) {
+    return 4;
+  }
+    if (has([
+      'film', 'movie', 'cinema', 'kino', 'tcm', 'warner', 'universal',
+      'action', 'thriller', 'horror', 'classic', 'sky cinema'
+    ])) {
+    return 5;
+  }
+    if (has([
+      'doku', 'documentary', 'discovery', 'nat geo', 'national geographic',
+      'animal', 'planet', 'history', 'wissen', 'biologie', 'technik'
+    ])) {
+    return 6;
+  }
+    if (has([
+      'news', 'n24', 'welt', 'ntv', 'n-tv', 'cnn', 'bloomberg',
+      'euronews', 'france 24', 'dw', 'deutsche welle'
+    ])) {
+    return 7;
+  }
+    if (has([
+      'disney', 'nick', 'cartoon', 'kids', 'baby', 'junior', 'family',
+      'zeichentrick', 'pbs kids'
+    ])) {
+    return 8;
+  }
+    if (has([
+      'mtv', 'viva', 'music', 'musik', 'radio', 'hit', 'pop', 'rock',
+      'jazz', 'classical', 'soundtrack'
+    ])) {
+    return 9;
+  }
+    return 10;
+  }
+
   Future<void> _toggleLiveTv() async {
     if (showLiveTv) {
       setState(() => showLiveTv = false);
@@ -2183,6 +2243,24 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     ));
+    list.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (var i = 0; i < liveCategories.length; i++)
+              ChoiceChip(
+                label: Text(liveCategories[i],
+                    style: const TextStyle(fontSize: 10)),
+                selected: liveCategory == i,
+                onSelected: (_) => setState(() => liveCategory = i),
+              ),
+          ],
+        ),
+      ),
+    ));
     if (liveLoading) {
       list.add(const SliverToBoxAdapter(
         child: SizedBox(
@@ -2194,8 +2272,11 @@ class _HomePageState extends State<HomePage> {
     }
     final q = liveSearchCtrl.text.trim().toLowerCase();
     final channels = liveChannels.where((c) {
-      if (q.isEmpty) return true;
-      return (c['title']?.toString() ?? '').toLowerCase().contains(q);
+      final title = c['title']?.toString() ?? '';
+      if (q.isNotEmpty && !title.toLowerCase().contains(q)) return false;
+      if (liveCategory == 1) return prefs.isFavoriteChannel(title);
+      if (liveCategory == 0) return true;
+      return _channelCategory(title) == liveCategory;
     }).toList();
     if (channels.isEmpty) {
       list.add(const SliverToBoxAdapter(
@@ -2238,6 +2319,26 @@ class _HomePageState extends State<HomePage> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 11),
                       ),
+                    ),
+                    IconButton(
+                      tooltip: prefs.isFavoriteChannel(title)
+                          ? 'Aus Favoriten entfernen'
+                          : 'Als Favorit merken',
+                      icon: Icon(
+                        prefs.isFavoriteChannel(title)
+                            ? Icons.star
+                            : Icons.star_border,
+                        size: 16,
+                        color: prefs.isFavoriteChannel(title)
+                            ? Colors.amber
+                            : Colors.white54,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () async {
+                        await prefs.toggleFavoriteChannel(title);
+                        if (mounted) setState(() {});
+                      },
                     ),
                   ],
                 ),

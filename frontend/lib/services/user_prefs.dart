@@ -10,6 +10,7 @@ class UserPrefs {
   final Map<String, int> durations = {};
   final Map<String, int> myRatings = {};
   final Map<String, String> myNotes = {};
+  final Set<String> favoriteChannels = {};
 
   static String get _path =>
       '${Platform.environment['HOME'] ?? '.'}/.flixam_player_prefs.json';
@@ -47,6 +48,9 @@ class UserPrefs {
         notes.forEach((key, value) {
           myNotes[key] = value.toString();
         });
+        for (final v in (map['favoriteChannels'] as List?) ?? []) {
+          favoriteChannels.add(v.toString());
+        }
       }
     } catch (_) {}
   }
@@ -64,6 +68,13 @@ class UserPrefs {
   int durationFor(String title) => durations[title] ?? 0;
 
   int ratingFor(String title) => myRatings[title] ?? 0;
+
+  bool isFavoriteChannel(String title) => favoriteChannels.contains(title);
+
+  Future<void> toggleFavoriteChannel(String title) async {
+    if (!favoriteChannels.remove(title)) favoriteChannels.add(title);
+    await _save();
+  }
   String noteFor(String title) => myNotes[title] ?? '';
 
   Future<void> setRating(String title, int rating) async {
@@ -117,6 +128,7 @@ class UserPrefs {
         'durations': durations,
         'myRatings': myRatings,
         'myNotes': myNotes,
+        'favoriteChannels': favoriteChannels.toList(),
       }));
     } catch (_) {}
   }
