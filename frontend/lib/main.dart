@@ -227,9 +227,41 @@ class _HomePageState extends State<HomePage> {
       return AppExitResponse.exit;
     });
     _start();
+    _loadAvailability();
     _autoRefreshTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       if (mounted && showHome) _refreshAll();
     });
+  }
+
+  Future<void> _loadAvailability() async {
+    try {
+      await AvailabilityService.instance.load();
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  bool _onlyAvailable() => appSettings.availabilityMode == 1;
+
+  bool _coverAvailable(dynamic item) {
+    final set = AvailabilityService.instance.loadedTitles;
+    if (set == null || set.isEmpty) return true;
+    if (item is! Map) return false;
+    return AvailabilityService.instance
+        .isAvailable(item['title']?.toString() ?? '');
+  }
+
+  bool _availableBadge(dynamic item) {
+    final set = AvailabilityService.instance.loadedTitles;
+    if (set == null || set.isEmpty || item is! Map) return false;
+    return AvailabilityService.instance
+        .isAvailable(item['title']?.toString() ?? '');
+  }
+
+  List<dynamic> _availabilityFiltered(Iterable<dynamic> items) {
+    if (!_onlyAvailable()) return items.toList();
+    final set = AvailabilityService.instance.loadedTitles;
+    if (set == null || set.isEmpty) return items.toList();
+    return items.where(_coverAvailable).toList();
   }
 
   Future<void> _refreshAll() async {
@@ -261,7 +293,7 @@ class _HomePageState extends State<HomePage> {
     setState(() => loading = true);
     try {
       var data = await api.home(force: force);
-      if (Platform.isAndroid && appSettings.onlyAvailable) {
+      if (_onlyAvailable()) {
         data = await AvailabilityService.instance.filterHome(data);
       }
       if (!mounted) return;
@@ -1241,6 +1273,38 @@ class _HomePageState extends State<HomePage> {
         return Column(
           children: [
             _settingsCard(
+              title: 'Verfügbarkeit',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Zeige nur Titel, die in unseren Quellen vorhanden sind',
+                    style: TextStyle(fontSize: 11, color: Colors.white54),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final mode in [0, 1])
+                        ChoiceChip(
+                          label: Text(mode == 0 ? 'Alle Titel' : 'Nur in unseren Quellen'),
+                          selected: appSettings.availabilityMode == mode,
+                          onSelected: (_) async {
+                            setState(() {
+                              appSettings.availabilityMode = mode;
+                              _fullSections.clear();
+                            });
+                            await appSettings.save();
+                            settingsRevision.value++;
+                            await _loadHome();
+                          },
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            _settingsCard(
               title: 'Quellen',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1913,9 +1977,10 @@ class _HomePageState extends State<HomePage> {
       return list;
     }
     for (final g in newSeriesGroups) {
-      final items = _langFiltered(((g['items'] as List?) ?? [])
-          .whereType<Map>()
-          .map((m) => m.cast<String, dynamic>()));
+      final items = _availabilityFiltered(_langFiltered(
+          ((g['items'] as List?) ?? [])
+              .whereType<Map>()
+              .map((m) => m.cast<String, dynamic>())));
       if (items.isEmpty) continue;
       final finalSid = int.tryParse(g['id']?.toString() ?? '') ?? 0;
       list.add(SliverToBoxAdapter(
@@ -2088,9 +2153,10 @@ class _HomePageState extends State<HomePage> {
       ),
     ];
     for (final g in providerNewGroups) {
-      final items = _langFiltered(((g['items'] as List?) ?? [])
-          .whereType<Map>()
-          .map((m) => m.cast<String, dynamic>()));
+      final items = _availabilityFiltered(_langFiltered(
+          ((g['items'] as List?) ?? [])
+              .whereType<Map>()
+              .map((m) => m.cast<String, dynamic>())));
       if (items.isEmpty) continue;
       final pid = int.tryParse(g['id']?.toString() ?? '') ?? 0;
       final expanded = _expandedProviders.contains(pid);
@@ -2276,11 +2342,9 @@ class _HomePageState extends State<HomePage> {
     setState(() => _loadingSections.add(title));
     try {
       var all = await api.homeAll(title);
-      if (Platform.isAndroid && appSettings.onlyAvailable) {
+      if (_onlyAvailable()) {
         await AvailabilityService.instance.load();
-        all = all.where((i) => AvailabilityService.instance.isAvailable(
-              (i as Map)['title']?.toString() ?? '',
-            )).toList();
+        all = _availabilityFiltered(all);
       }
       if (!mounted) return;
       setState(() {
@@ -2589,6 +2653,7 @@ class _HomePageState extends State<HomePage> {
     final year = yearCtrl.text.trim();
     var out = input.where((i) {
       if (!_langOk(i)) return false;
+      if (!_coverAvailable(i)) return false;
       if (i is! Map) return false;
       if (year.isNotEmpty && (i['year']?.toString() ?? '') != year) return false;
       if (monthFilter != 'Alle') {
@@ -2748,6 +2813,7 @@ class _HomePageState extends State<HomePage> {
   Widget _homeItemCard(Map<String, dynamic> it, {bool autofocus = false}) {
     final poster = it['poster_url']?.toString() ?? '';
     final label = it['title']?.toString() ?? '';
+    final avail = _availableBadge(it);
     return TvFocusable(
       autofocus: autofocus,
       onTap: () {
@@ -2797,9 +2863,15 @@ class _HomePageState extends State<HomePage> {
                       ),
                     if (prefs.isFavorite(it))
                       Positioned(
-                        right: 4,
+                        right: avail ? 26 : 4,
                         top: 4,
                         child: Icon(Icons.favorite, color: accent(context), size: 18),
+                      ),
+                    if (avail)
+                      const Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Icon(Icons.verified, color: Colors.green, size: 17),
                       ),
                     if (_sourceLabel(it).isNotEmpty)
                       Positioned(
@@ -2978,7 +3050,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   List<Widget> _buildFavoriteSlivers() {
-    final items = _langFiltered(prefs.favoriteList());
+    final items = _availabilityFiltered(_langFiltered(prefs.favoriteList()));
     return [
       SliverToBoxAdapter(
         child: Padding(
@@ -3161,7 +3233,8 @@ class _HomePageState extends State<HomePage> {
 
     for (final section in (data['sections'] as List?) ?? []) {
       final title = section['title']?.toString() ?? '';
-      final items = _langFiltered((section['items'] as List?) ?? []);
+      final items = _availabilityFiltered(
+          _langFiltered((section['items'] as List?) ?? []));
       final expanded = expandedSection == title ||
           fskFilter != 'Alle' ||
           yearCtrl.text.trim().isNotEmpty ||
@@ -3195,7 +3268,7 @@ class _HomePageState extends State<HomePage> {
       ));
       if (expanded) {
         // Komplette Kategorie inline auf der Startseite anzeigen.
-        final allItems = _fullSections[title] ?? items;
+        final allItems = _availabilityFiltered(_fullSections[title] ?? items);
         if (_loadingSections.contains(title)) {
           list.add(const SliverToBoxAdapter(
             child: Padding(

@@ -13,6 +13,7 @@ class AppSettings {
   int layout;
   bool onlyGerman;
   int languageMode;
+  int availabilityMode;
   String backendUrl;
 
   static const String defaultBackendUrl = String.fromEnvironment(
@@ -31,6 +32,7 @@ class AppSettings {
     this.layout = 0,
     this.onlyGerman = false,
     this.languageMode = 0,
+    this.availabilityMode = 0,
     this.backendUrl = defaultBackendUrl,
   });
 
@@ -56,6 +58,7 @@ class AppSettings {
           onlyGerman: map['onlyGerman'] as bool? ?? false,
           languageMode: (map['languageMode'] as num?)?.toInt() ??
               ((map['onlyGerman'] as bool?) ?? false ? 1 : 0),
+          availabilityMode: (map['availabilityMode'] as num?)?.toInt() ?? 0,
           backendUrl: map['backendUrl']?.toString().isNotEmpty ?? false
               ? map['backendUrl'].toString()
               : defaultBackendUrl,
@@ -78,6 +81,7 @@ class AppSettings {
         'layout': layout,
         'onlyGerman': onlyGerman,
         'languageMode': languageMode,
+        'availabilityMode': availabilityMode,
         'backendUrl': backendUrl,
       }));
     } catch (_) {}

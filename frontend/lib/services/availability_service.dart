@@ -13,6 +13,7 @@ class AvailabilityService {
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36';
 
   Set<String>? _titles;
+  Set<String>? get loadedTitles => _titles;
   final Map<String, Set<String>> _bySource = {};
   final Map<String, List<Map<String, String>>> _sourceCache = {};
   AvailabilityService._();
