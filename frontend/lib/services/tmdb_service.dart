@@ -366,23 +366,52 @@ class TmdbService {
   Future<List<Map<String, dynamic>>> providerRecentItems(
     int id, {
     int limit = 40,
+    String year = '',
   }) async {
     final out = <Map<String, dynamic>>[];
     final seen = <String>{};
-    for (final entry in [
-      {'path': 'discover/movie', 'type': 'movie', 'sort': 'release_date.desc'},
-      {'path': 'discover/tv', 'type': 'tv', 'sort': 'first_air_date.desc'},
-    ]) {
-      for (var page = 1; page <= 3; page++) {
-        final data = await _get(entry['path']!, {
+    final plan = year.isNotEmpty
+        ? [
+            {
+              'path': 'discover/movie',
+              'type': 'movie',
+              'sort': 'popularity.desc',
+              'pages': 15,
+            },
+          ]
+        : [
+            {
+              'path': 'discover/movie',
+              'type': 'movie',
+              'sort': 'release_date.desc',
+              'pages': 3,
+            },
+            {
+              'path': 'discover/tv',
+              'type': 'tv',
+              'sort': 'first_air_date.desc',
+              'pages': 3,
+            },
+          ];
+    for (final entry in plan) {
+      for (var page = 1; page <= (entry['pages'] as int); page++) {
+        final params = <String, dynamic>{
           'with_watch_providers': id,
           'watch_region': 'DE',
           'sort_by': entry['sort'],
           'page': page,
-        }) ?? {};
+        };
+        if (year.isNotEmpty && entry['type'] == 'movie') {
+          params['primary_release_year'] = year;
+        }
+        final data = await _get(entry['path']! as String, params) ?? {};
         for (final r in (data['results'] as List?) ?? []) {
-          final it = await toItem(r, entry['type']!);
-          if (it != null && seen.add(it['title'].toString())) out.add(it);
+          final it = await toItem(r, entry['type']! as String);
+          if (it == null) continue;
+          if (year.isNotEmpty && it['year']?.toString() != year) {
+            continue;
+          }
+          if (seen.add(it['title'].toString())) out.add(it);
           if (out.length >= limit) break;
         }
         if (out.length >= limit) break;

@@ -1011,35 +1011,49 @@ def tmdb_series_new(originals: bool = True, limit: int = 12):
 
 
 @app.get("/tmdb/provider/recent")
-def tmdb_provider_recent(id: str = Query(""), limit: int = 40):
-    """Alle neuesten Titel eines einzelnen Streaminganbieters."""
+def tmdb_provider_recent(id: str = Query(""), limit: int = 40,
+                         year: str = Query("")):
+    """Neueste Titel eines Anbieters - optional alle Filme eines Jahres."""
     if not id:
         return {"items": []}
-    cache_key = f"provider|recent|{id}|{limit}"
+    cache_key = f"provider|recent|{id}|{limit}|{year}"
     if cache_key in _TMDB_CACHE:
         return {"items": _TMDB_CACHE[cache_key]}
     out = []
     seen = set()
-    for path, media_type, sort_by in (
-        ("discover/movie", "movie", "release_date.desc"),
-        ("discover/tv", "tv", "first_air_date.desc"),
-    ):
-        for page in (1, 2, 3):
-            data = _tmdb_get(path, {
+    if year.isdigit():
+        plan = (("discover/movie", "movie", "popularity.desc", 15),)
+    else:
+        plan = (
+            ("discover/movie", "movie", "release_date.desc", 3),
+            ("discover/tv", "tv", "first_air_date.desc", 3),
+        )
+    for path, media_type, sort_by, pages in plan:
+        for page in range(1, pages + 1):
+            params = {
                 "with_watch_providers": id,
                 "watch_region": "DE",
                 "sort_by": sort_by,
                 "page": page,
-            }) or {}
+            }
+            if year.isdigit() and media_type == "movie":
+                params["primary_release_year"] = year
+            data = _tmdb_get(path, params) or {}
             results = data.get("results") or []
             if not results:
                 break
             for r in results:
                 item = _tmdb_to_item(r, media_type)
-                if item and item.get("title") and item["title"] not in seen:
+                if not item or not item.get("title"):
+                    continue
+                if year.isdigit() and item.get("year") != year:
+                    continue
+                if item["title"] not in seen:
                     seen.add(item["title"])
                     out.append(item)
-            if len(out) >= limit or page >= min(int(data.get("total_pages") or 1), 3):
+            if len(out) >= limit:
+                break
+            if page >= min(int(data.get("total_pages") or 1), pages):
                 break
         if len(out) >= limit:
             break

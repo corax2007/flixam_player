@@ -113,6 +113,7 @@ class _HomePageState extends State<HomePage> {
   final Map<int, List<dynamic>> _seriesMoreItems = {};
   final Set<int> _seriesMoreLoading = {};
   final Set<int> _expandedProviders = {};
+  final Map<int, String> _providerYears = {};
   final Map<int, List<dynamic>> _providerMoreItems = {};
   final Set<int> _providerMoreLoading = {};
   String? sourceEpisodesLabel;
@@ -2006,6 +2007,24 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => providerNewLoading = false);
   }
 
+  Future<void> _changeProviderYear(dynamic group, String year) async {
+    final id = int.tryParse(group['id']?.toString() ?? '') ?? 0;
+    setState(() {
+      _providerYears[id] = year;
+      _expandedProviders.add(id);
+      _providerMoreLoading.add(id);
+    });
+    try {
+      final items = await api.providerRecentItems(
+        id,
+        limit: year == 'Alle' ? 200 : 300,
+        year: year,
+      );
+      if (mounted) setState(() => _providerMoreItems[id] = items);
+    } catch (_) {}
+    if (mounted) setState(() => _providerMoreLoading.remove(id));
+  }
+
   Future<void> _toggleProviderMore(dynamic group) async {
     final id = int.tryParse(group['id']?.toString() ?? '') ?? 0;
     if (_expandedProviders.contains(id)) {
@@ -2082,12 +2101,25 @@ class _HomePageState extends State<HomePage> {
             children: [
               Icon(Icons.new_releases, size: 16, color: accent(context)),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  g['name']?.toString() ?? 'Anbieter',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
+              Text(
+                g['name']?.toString() ?? 'Anbieter',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
+              const SizedBox(width: 8),
+              DropdownButton<String>(
+                value: _providerYears[pid] ?? 'Alle',
+                isDense: true,
+                items: [
+                  for (final y in [
+                    'Alle', '2026', '2025', '2024', '2023', '2022', '2021', '2020'
+                  ])
+                    DropdownMenuItem<String>(value: y, child: Text(y)),
+                ],
+                onChanged: (v) {
+                  if (v != null) _changeProviderYear(g, v);
+                },
+              ),
+              const Spacer(),
               if (_providerMoreLoading.contains(pid))
                 const SizedBox(
                   width: 16,
