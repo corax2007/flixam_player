@@ -2506,13 +2506,23 @@ class _HomePageState extends State<HomePage> {
               children: [
                 Icon(Icons.movie_filter_outlined, color: d.accent, size: 22),
                 const SizedBox(width: 8),
-                const Text(
-                  'AETHER',
-                  style: TextStyle(
-                    fontSize: 15,
-                    letterSpacing: 3,
-                    fontWeight: FontWeight.w600,
+                const Expanded(
+                  child: Text(
+                    'AETHER',
+                    style: TextStyle(
+                      fontSize: 15,
+                      letterSpacing: 3,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                ),
+                IconButton(
+                  tooltip: 'Kategorien aktualisieren',
+                  icon: const Icon(Icons.refresh, size: 18),
+                  color: Colors.white70,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: _refreshAll,
                 ),
               ],
             ),
