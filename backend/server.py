@@ -1851,6 +1851,7 @@ DOWNLOAD_DIR = os.path.join(
     os.path.dirname(BASE_DIR), "flixam_downloads"
 )
 _DOWNLOADS = {}
+_DOWNLOAD_PROCS = {}
 _DOWNLOAD_LOCK = threading.Lock()
 
 
@@ -1864,9 +1865,12 @@ def _download_worker(key: str, stream_url: str, headers: dict) -> None:
     path = os.path.join(DOWNLOAD_DIR, key)
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     cmd = ["ffmpeg", "-y", "-loglevel", "error"]
-    header_str = "&".join(f"{k}={v}" for k, v in (headers or {}).items())
+    header_str = "".join(
+        f"{k}: {str(v).replace(chr(10), ' ').replace(chr(13), ' ')}\r\n"
+        for k, v in (headers or {}).items()
+    )
     if header_str:
-        cmd += ["-headers", header_str + "\r\n"]
+        cmd += ["-headers", header_str]
     cmd += [
         "-i", stream_url,
         "-c", "copy",
@@ -1880,12 +1884,19 @@ def _download_worker(key: str, stream_url: str, headers: dict) -> None:
         proc = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
+        with _DOWNLOAD_LOCK:
+            _DOWNLOAD_PROCS[key] = proc
         duration = 0.0
         try:
+            probe_cmd = ["ffprobe", "-v", "error"]
+            if header_str:
+                probe_cmd += ["-headers", header_str]
+            probe_cmd += [
+                "-show_entries", "format=duration", "-of", "csv=p=0",
+                stream_url,
+            ]
             probe = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries",
-                 "format=duration", "-of", "csv=p=0", stream_url],
-                capture_output=True, text=True, timeout=30,
+                probe_cmd, capture_output=True, text=True, timeout=30,
             )
             duration = float((probe.stdout or "0").strip() or 0)
         except Exception:
@@ -1915,6 +1926,9 @@ def _download_worker(key: str, stream_url: str, headers: dict) -> None:
         with _DOWNLOAD_LOCK:
             _DOWNLOADS[key]["status"] = "error"
             _DOWNLOADS[key]["error"] = str(e)[:400]
+    finally:
+        with _DOWNLOAD_LOCK:
+            _DOWNLOAD_PROCS.pop(key, None)
 
 
 @app.post("/download/start")
@@ -1973,7 +1987,13 @@ def download_delete(name: str):
         except OSError:
             pass
     with _DOWNLOAD_LOCK:
+        proc = _DOWNLOAD_PROCS.pop(name, None)
         _DOWNLOADS.pop(name, None)
+    if proc is not None:
+        try:
+            proc.terminate()
+        except OSError:
+            pass
     return {"ok": True}
 
 
