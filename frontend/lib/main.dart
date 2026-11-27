@@ -104,6 +104,7 @@ class _HomePageState extends State<HomePage> {
   bool showProviderNew = false;
   bool providerNewLoading = false;
   bool showViewPanel = false;
+  Map<String, dynamic>? _listPreviewItem;
   bool showAddonCatalog = false;
   bool addonCatalogLoading = false;
   List<dynamic> addonSites = [];
@@ -2414,19 +2415,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ));
       } else {
-        list.add(SliverToBoxAdapter(
-          child: SizedBox(
-            height: _viewRowHeight(),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (ctx, i) =>
-                  _homeItemCard(items[i], autofocus: i == 0),
-            ),
-          ),
-        ));
+        list.add(SliverToBoxAdapter(child: _buildCoverRow(items)));
       }
     }
     return list;
@@ -3005,6 +2994,115 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Eine Kachel fuer die Home-Reihen (horizontal oder im auf geklappten Raster).
+  Widget _buildCoverRow(List<dynamic> items) {
+    final mode = appSettings.viewMode;
+    if (mode != 0 && mode != 1) {
+      return SizedBox(
+        height: _viewRowHeight(),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (ctx, i) =>
+              _homeItemCard(items[i] as Map<String, dynamic>, autofocus: i == 0),
+        ),
+      );
+    }
+    if (items.isEmpty) return const SizedBox.shrink();
+    final preview = _listPreviewItem ?? (items.first as Map<String, dynamic>);
+    final listPane = Expanded(
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (ctx, i) {
+          final it = items[i] as Map<String, dynamic>;
+          final title = it['title']?.toString() ?? '';
+          final selected = preview['title'] == it['title'];
+          final thumb = it['poster_url']?.toString() ?? '';
+          return ListTile(
+            dense: true,
+            selected: selected,
+            selectedTileColor: accent(context).withValues(alpha: 0.22),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                width: 42,
+                height: 62,
+                child: thumb.isNotEmpty
+                    ? Image.network(thumb, fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            Container(color: Colors.grey.shade900))
+                    : Container(color: Colors.grey.shade900),
+              ),
+            ),
+            title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: Text(it['year']?.toString() ?? '',
+                style: const TextStyle(fontSize: 10, color: Colors.white54)),
+            onTap: () {
+              setState(() => _listPreviewItem = it);
+              _loadHeroSources(title);
+              _loadHeroTrailer(it);
+            },
+          );
+        },
+      ),
+    );
+    final poster = preview['poster_url']?.toString() ?? '';
+    final previewPane = SizedBox(
+      width: 240,
+      child: Container(
+        margin: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: surf(context),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (poster.isNotEmpty)
+              Image.network(poster, fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      Container(color: Colors.grey.shade900))
+            else
+              Container(color: Colors.grey.shade900),
+            Positioned(
+              left: 0, right: 0, bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                color: Colors.black.withValues(alpha: 0.75),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(preview['title']?.toString() ?? '',
+                        maxLines: 2,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700)),
+                    if (preview['year'] != null)
+                      Text(preview['year'].toString(),
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    return SizedBox(
+      height: 350,
+      child: Row(
+        children: mode == 0 ? [listPane, previewPane] : [previewPane, listPane],
+      ),
+    );
+  }
+
   double _viewCardWidth() {
     switch (appSettings.viewMode) {
       case 1: return 140;
@@ -3534,17 +3632,8 @@ class _HomePageState extends State<HomePage> {
         ));
       } else {
         list.add(SliverToBoxAdapter(
-          child: SizedBox(
-            height: _viewRowHeight(),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (ctx, i) =>
-                  _homeItemCard((items[i] as Map).cast<String, dynamic>(),
-                    autofocus: i == 0),
-            ),
+          child: _buildCoverRow(
+            items.map((i) => (i as Map).cast<String, dynamic>()).toList(),
           ),
         ));
       }
