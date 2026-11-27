@@ -891,6 +891,44 @@ def tmdb_providers():
     return {"providers": result}
 
 
+@app.get("/tmdb/provider/recent")
+def tmdb_provider_recent(id: str = Query(""), limit: int = 40):
+    """Alle neuesten Titel eines einzelnen Streaminganbieters."""
+    if not id:
+        return {"items": []}
+    cache_key = f"provider|recent|{id}|{limit}"
+    if cache_key in _TMDB_CACHE:
+        return {"items": _TMDB_CACHE[cache_key]}
+    out = []
+    seen = set()
+    for path, media_type, sort_by in (
+        ("discover/movie", "movie", "release_date.desc"),
+        ("discover/tv", "tv", "first_air_date.desc"),
+    ):
+        for page in (1, 2, 3):
+            data = _tmdb_get(path, {
+                "with_watch_providers": id,
+                "watch_region": "DE",
+                "sort_by": sort_by,
+                "page": page,
+            }) or {}
+            results = data.get("results") or []
+            if not results:
+                break
+            for r in results:
+                item = _tmdb_to_item(r, media_type)
+                if item and item.get("title") and item["title"] not in seen:
+                    seen.add(item["title"])
+                    out.append(item)
+            if len(out) >= limit or page >= min(int(data.get("total_pages") or 1), 3):
+                break
+        if len(out) >= limit:
+            break
+    out = out[:limit]
+    _TMDB_CACHE[cache_key] = out
+    return {"items": out}
+
+
 @app.get("/tmdb/providers/recent")
 def tmdb_providers_recent(limit: int = 8):
     """Neueste Titel pro Streaminganbieter (DE), nach Release-Datum sortiert."""

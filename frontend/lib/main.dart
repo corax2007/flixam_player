@@ -104,6 +104,9 @@ class _HomePageState extends State<HomePage> {
   bool showProviderNew = false;
   bool providerNewLoading = false;
   List<dynamic> providerNewGroups = [];
+  final Set<int> _expandedProviders = {};
+  final Map<int, List<dynamic>> _providerMoreItems = {};
+  final Set<int> _providerMoreLoading = {};
   String? sourceEpisodesLabel;
   String sourceEpisodesTitle = '';
   List<dynamic> sourceEpisodeSeasons = [];
@@ -1383,6 +1386,25 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => providerNewLoading = false);
   }
 
+  Future<void> _toggleProviderMore(dynamic group) async {
+    final id = int.tryParse(group['id']?.toString() ?? '') ?? 0;
+    if (_expandedProviders.contains(id)) {
+      setState(() => _expandedProviders.remove(id));
+      return;
+    }
+    setState(() {
+      _expandedProviders.add(id);
+      _providerMoreLoading.add(id);
+    });
+    if (!_providerMoreItems.containsKey(id)) {
+      try {
+        final items = await api.providerRecentItems(id, limit: 60);
+        if (mounted) setState(() => _providerMoreItems[id] = items);
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _providerMoreLoading.remove(id));
+  }
+
   List<Widget> _buildProviderNewSlivers() {
     if (providerNewLoading) {
       return [
@@ -1432,6 +1454,8 @@ class _HomePageState extends State<HomePage> {
           .map((m) => m.cast<String, dynamic>())
           .toList();
       if (items.isEmpty) continue;
+      final pid = int.tryParse(g['id']?.toString() ?? '') ?? 0;
+      final expanded = _expandedProviders.contains(pid);
       list.add(SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -1439,27 +1463,59 @@ class _HomePageState extends State<HomePage> {
             children: [
               Icon(Icons.new_releases, size: 16, color: accent(context)),
               const SizedBox(width: 6),
-              Text(
-                g['name']?.toString() ?? 'Anbieter',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              Expanded(
+                child: Text(
+                  g['name']?.toString() ?? 'Anbieter',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
               ),
+              if (_providerMoreLoading.contains(pid))
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton(
+                  onPressed: () => _toggleProviderMore(g),
+                  child: Text(expanded ? 'weniger' : 'mehr'),
+                ),
             ],
           ),
         ),
       ));
-      list.add(SliverToBoxAdapter(
-        child: SizedBox(
-          height: 206,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (ctx, i) =>
-                _homeItemCard(items[i], autofocus: i == 0),
+      if (expanded) {
+        final all = _providerMoreItems[pid] ?? items;
+        list.add(SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 140,
+              childAspectRatio: 2 / 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (ctx, i) => _homeItemCard(all[i], autofocus: i == 0),
+              childCount: all.length,
+            ),
           ),
-        ),
-      ));
+        ));
+      } else {
+        list.add(SliverToBoxAdapter(
+          child: SizedBox(
+            height: 206,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (ctx, i) =>
+                  _homeItemCard(items[i], autofocus: i == 0),
+            ),
+          ),
+        ));
+      }
     }
     return list;
   }

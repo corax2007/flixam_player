@@ -142,6 +142,18 @@ class ApiService {
     return (j['providers'] as List?) ?? [];
   }
 
+  Future<List<dynamic>> providerRecentItems(int id, {int limit = 40}) async {
+    if (useDirect) {
+      return (await TmdbService.instance.providerRecentItems(id, limit: limit))
+          .cast<dynamic>();
+    }
+    final r = await http.get(
+      Uri.parse('$baseUrl/tmdb/provider/recent?id=$id&limit=$limit'),
+    ).timeout(const Duration(seconds: 180));
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return (j['items'] as List?) ?? [];
+  }
+
   Future<List<dynamic>> providerRecent() async {
     if (useDirect) {
       return (await TmdbService.instance.recentByProvider()).cast<dynamic>();

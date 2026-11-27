@@ -268,6 +268,36 @@ class TmdbService {
     return out;
   }
 
+  /// Alle neuesten Titel eines Anbieters (fuer das "mehr" der Uebersicht).
+  Future<List<Map<String, dynamic>>> providerRecentItems(
+    int id, {
+    int limit = 40,
+  }) async {
+    final out = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    for (final entry in [
+      {'path': 'discover/movie', 'type': 'movie', 'sort': 'release_date.desc'},
+      {'path': 'discover/tv', 'type': 'tv', 'sort': 'first_air_date.desc'},
+    ]) {
+      for (var page = 1; page <= 3; page++) {
+        final data = await _get(entry['path']!, {
+          'with_watch_providers': id,
+          'watch_region': 'DE',
+          'sort_by': entry['sort'],
+          'page': page,
+        }) ?? {};
+        for (final r in (data['results'] as List?) ?? []) {
+          final it = await toItem(r, entry['type']!);
+          if (it != null && seen.add(it['title'].toString())) out.add(it);
+          if (out.length >= limit) break;
+        }
+        if (out.length >= limit) break;
+      }
+      if (out.length >= limit) break;
+    }
+    return out.take(limit).toList();
+  }
+
   /// Neueste Titel pro Anbieter (Dart-Direktmodus fuer Android/Fire TV).
   Future<List<Map<String, dynamic>>> recentByProvider({int limit = 8}) async {
     final providerList = await providers();
