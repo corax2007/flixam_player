@@ -109,6 +109,7 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> newSeriesGroups = [];
   List<dynamic> providerNewGroups = [];
   final Set<int> _expandedSeries = {};
+  final Map<int, String> _seriesYears = {};
   final Map<int, List<dynamic>> _seriesMoreItems = {};
   final Set<int> _seriesMoreLoading = {};
   final Set<int> _expandedProviders = {};
@@ -1823,6 +1824,24 @@ class _HomePageState extends State<HomePage> {
     if (newSeriesGroups.isEmpty) await _loadNewSeries();
   }
 
+  Future<void> _changeSeriesYear(dynamic group, String year) async {
+    final id = int.tryParse(group['id']?.toString() ?? '') ?? 0;
+    setState(() {
+      _seriesYears[id] = year;
+      _expandedSeries.add(id);
+      _seriesMoreLoading.add(id);
+    });
+    try {
+      final items = await api.seriesNetworkItems(
+        id,
+        limit: 200,
+        year: year,
+      );
+      if (mounted) setState(() => _seriesMoreItems[id] = items);
+    } catch (_) {}
+    if (mounted) setState(() => _seriesMoreLoading.remove(id));
+  }
+
   Future<void> _toggleSeriesMore(dynamic group) async {
     final id = int.tryParse(group['id']?.toString() ?? '') ?? 0;
     if (_expandedSeries.contains(id)) {
@@ -1905,13 +1924,26 @@ class _HomePageState extends State<HomePage> {
             children: [
               Icon(Icons.tv_outlined, size: 16, color: accent(context)),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  g['name']?.toString() ?? 'Netzwerk',
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700),
-                ),
+              Text(
+                g['name']?.toString() ?? 'Netzwerk',
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700),
               ),
+              const SizedBox(width: 8),
+              DropdownButton<String>(
+                value: _seriesYears[finalSid] ?? 'Alle',
+                isDense: true,
+                items: [
+                  for (final y in [
+                    'Alle', '2026', '2025', '2024', '2023', '2022', '2021', '2020'
+                  ])
+                    DropdownMenuItem<String>(value: y, child: Text(y)),
+                ],
+                onChanged: (v) {
+                  if (v != null) _changeSeriesYear(g, v);
+                },
+              ),
+              const Spacer(),
               if (_seriesMoreLoading.contains(finalSid))
                 const SizedBox(
                   width: 16,

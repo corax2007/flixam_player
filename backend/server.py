@@ -902,11 +902,12 @@ ORIGINAL_NETWORKS = [
 
 
 @app.get("/tmdb/series/network")
-def tmdb_series_network(id: str = Query(""), limit: int = 60):
-    """Alle neuesten Serien eines Netzwerks (fuer "mehr")."""
+def tmdb_series_network(id: str = Query(""), limit: int = 60,
+                        year: str = Query("")):
+    """Alle Serien eines Netzwerks, optional nach Jahr (fuer "mehr")."""
     if not id:
         return {"items": []}
-    cache_key = f"series|network|{id}|{limit}"
+    cache_key = f"series|network|{id}|{limit}|{year}"
     if cache_key in _TMDB_CACHE:
         return {"items": _TMDB_CACHE[cache_key]}
     out = []
@@ -916,11 +917,15 @@ def tmdb_series_network(id: str = Query(""), limit: int = 60):
     # sonst fehlen Titel, die nur auf spaeteren Datum-Seiten liegen.
     for sort_by, pages in (("first_air_date.desc", 10), ("popularity.desc", 5)):
         for page in range(1, pages + 1):
-            data = _tmdb_get("discover/tv", {
+            params = {
                 "with_networks": id,
                 "sort_by": sort_by,
                 "page": page,
-            }) or {}
+            }
+            if year.isdigit():
+                params["first_air_date_year"] = year
+                params["sort_by"] = "popularity.desc"
+            data = _tmdb_get("discover/tv", params) or {}
             results = data.get("results") or []
             if not results:
                 break
@@ -929,7 +934,10 @@ def tmdb_series_network(id: str = Query(""), limit: int = 60):
                 if not item or not item.get("title") or not item.get("poster_url"):
                     continue
                 try:
-                    if int(item.get("year") or 9999) > _date.today().year:
+                    y = int(item.get("year") or 9999)
+                    if y > _date.today().year:
+                        continue
+                    if year.isdigit() and y != int(year):
                         continue
                 except (TypeError, ValueError):
                     continue

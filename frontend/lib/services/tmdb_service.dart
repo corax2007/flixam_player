@@ -273,6 +273,7 @@ class TmdbService {
   Future<List<Map<String, dynamic>>> seriesNetworkItems(
     int id, {
     int limit = 200,
+    String year = '',
   }) async {
     final out = <Map<String, dynamic>>[];
     final seen = <String>{};
@@ -281,17 +282,23 @@ class TmdbService {
       {'sort': 'popularity.desc', 'pages': 5},
     ]) {
       for (var page = 1; page <= (entry['pages'] as int); page++) {
-        final data = await _get('discover/tv', {
+        final params = <String, dynamic>{
           'with_networks': id,
           'sort_by': entry['sort'],
           'page': page,
-        }) ?? {};
+        };
+        if (year.isNotEmpty) {
+          params['first_air_date_year'] = year;
+          params['sort_by'] = 'popularity.desc';
+        }
+        final data = await _get('discover/tv', params) ?? {};
         for (final r in (data['results'] as List?) ?? []) {
           final it = await toItem(r, 'tv');
           if (it == null) continue;
           if ((it['poster_url']?.toString() ?? '').isEmpty) continue;
-          final year = int.tryParse(it['year']?.toString() ?? '') ?? 9999;
-          if (year > DateTime.now().year) continue;
+          final y = int.tryParse(it['year']?.toString() ?? '') ?? 9999;
+          if (y > DateTime.now().year) continue;
+          if (year.isNotEmpty && y != int.tryParse(year)) continue;
           if (seen.add(it['title'].toString())) out.add(it);
           if (out.length >= limit) break;
         }
