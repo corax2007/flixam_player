@@ -1496,6 +1496,16 @@ class _HomePageState extends State<HomePage> {
   }) {
     final backdrop = item['backdrop_url']?.toString() ?? '';
     final title = item['title']?.toString() ?? '';
+    final aether = appSettings.layout == 1;
+    final secondaryStyle = aether
+        ? OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.white54),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+          )
+        : null;
     return SliverToBoxAdapter(
       child: SizedBox(
         height: 340,
@@ -1503,23 +1513,53 @@ class _HomePageState extends State<HomePage> {
           fit: StackFit.expand,
           children: [
             if (backdrop.isNotEmpty)
-              Image.network(
-                backdrop,
-                fit: BoxFit.cover,
-                // Backdrops sind 16:9, das Banner viel breiter - oben
-                // ausrichten, damit Gesichter nicht abgeschnitten werden.
-                alignment: Alignment.topCenter,
-                errorBuilder: (_, _, _) => Container(color: surf(context)),
-              ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, bg(context)],
+              if (aether)
+                Transform.translate(
+                  offset: const Offset(-210, 0),
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    child: Image.network(
+                      backdrop,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
+                      errorBuilder: (_, _, _) => Container(color: surf(context)),
+                    ),
+                  ),
+                )
+              else
+                Image.network(
+                  backdrop,
+                  fit: BoxFit.cover,
+                  // Backdrops sind 16:9, das Banner viel breiter - oben
+                  // ausrichten, damit Gesichter nicht abgeschnitten werden.
+                  alignment: Alignment.topCenter,
+                  errorBuilder: (_, _, _) => Container(color: surf(context)),
+                ),
+            if (aether)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      bg(context).withValues(alpha: 0.58),
+                      bg(context).withValues(alpha: 0.48),
+                      bg(context).withValues(alpha: 0.10),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              )
+            else
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, bg(context)],
+                  ),
                 ),
               ),
-            ),
             if (onClose != null)
               Positioned(
                 right: 12,
@@ -1541,18 +1581,18 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       eyebrow,
                       style: TextStyle(
-                        color: appSettings.layout == 1
+                        color: aether
                             ? Colors.white54
                             : accent(context),
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: appSettings.layout == 1 ? 2 : 0,
+                        letterSpacing: aether ? 2 : 0,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       title,
-                      style: appSettings.layout == 1
+                      style: aether
                           ? const TextStyle(
                               fontSize: 38,
                               fontWeight: FontWeight.w300,
@@ -1651,13 +1691,54 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        FilledButton.icon(
-                          onPressed: () => _play(item['url']?.toString() ?? '', title),
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('Jetzt abspielen'),
-                        ),
+                        if (aether)
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withValues(alpha: 0.26),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                side: const BorderSide(color: Colors.white38),
+                              ),
+                            ),
+                            onPressed: () => _play(item['url']?.toString() ?? '', title),
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Abspielen'),
+                          )
+                        else
+                          FilledButton.icon(
+                            onPressed: () => _play(item['url']?.toString() ?? '', title),
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('Jetzt abspielen'),
+                          ),
+                        if (aether) ...[
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () async {
+                              await prefs.toggleFavorite(item);
+                              if (mounted) setState(() {});
+                            },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white54),
+                              ),
+                              child: Icon(
+                                prefs.isFavorite(item) ? Icons.check : Icons.add,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
+                          style: secondaryStyle,
                           onPressed: () {
                             setState(() => selectedItem = item);
                             _showDetail();
@@ -1668,6 +1749,7 @@ class _HomePageState extends State<HomePage> {
                         if (onResume != null) ...[
                           const SizedBox(width: 8),
                           OutlinedButton.icon(
+                            style: secondaryStyle,
                             onPressed: onResume,
                             icon: const Icon(Icons.restore),
                             label: const Text('Fortsetzen'),
@@ -1676,6 +1758,7 @@ class _HomePageState extends State<HomePage> {
                         if (trailerKey != null && onTrailer != null) ...[
                           const SizedBox(width: 8),
                           OutlinedButton.icon(
+                            style: secondaryStyle,
                             onPressed: onTrailer,
                             icon: const Icon(Icons.movie_outlined),
                             label: const Text('Trailer'),
@@ -2391,7 +2474,7 @@ class _HomePageState extends State<HomePage> {
     final d = designAt(appSettings.design);
     return Container(
       width: 210,
-      color: d.background,
+      color: d.background.withValues(alpha: 0.70),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
