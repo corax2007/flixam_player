@@ -506,6 +506,104 @@ def _collect_pages(addon_id: str, first_url: str, max_pages: int = 5):
     return result
 
 
+ADDON_CATALOG_SITES = [
+    "animetoast", "aniworld", "burningseries", "einschalten", "filmo",
+    "filmpalast", "hdfilme", "internetarchive", "kellerkino", "kinoger",
+    "megakino", "moflix-stream", "movie2k", "netzkino", "serienstream",
+    "streamcloud",
+]
+
+
+@app.get("/addon/catalog/sites")
+def addon_catalog_sites():
+    """Alle xStream-Sites mit echtem Bestands-Katalog."""
+    return {"sites": ADDON_CATALOG_SITES}
+
+
+@app.get("/addon/catalog")
+def addon_catalog(site: str = Query(""), type: str = Query("movie"),
+                  pages: int = 15):
+    """Bestands-Katalog einer Site: alle Filme oder Serien, die dort liegen."""
+    if site not in ADDON_CATALOG_SITES:
+        return {"items": []}
+    cache_key = f"addon|catalog|{site}|{type}|{pages}"
+    if cache_key in _TMDB_CACHE:
+        return {"items": _TMDB_CACHE[cache_key]}
+    addon_id = "plugin.video.xstream"
+    base = f"plugin://{addon_id}/"
+    try:
+        root = run_addon(addon_id, base + f"?site={quote(site)}")
+        wanted = ("filme", "movies", "alle filme") if type == "movie" \
+            else ("serien", "shows", "tv", "alle serien")
+        menu = next(
+            (i for i in root
+             if any(w in str(i.get("title") or "").lower() for w in wanted)),
+            None,
+        )
+        if not menu:
+            menu = next(
+                (i for i in root
+                 if any(w in str(i.get("title") or "").lower()
+                        for w in ("startseite", "home", "neu"))),
+                None,
+            )
+        start_url = ""
+        if menu:
+            menu_url = str(menu.get("url") or "")
+            level = run_addon(addon_id, menu_url)
+            has_entries = any(
+                "function=showHosters" in str(i.get("url") or "")
+                or "function=showSeasons" in str(i.get("url") or "")
+                for i in level
+            )
+            if has_entries:
+                start_url = menu_url
+            else:
+                target = next(
+                    (i for i in level
+                     if "alle" in str(i.get("title") or "").lower()
+                     or "all" in str(i.get("title") or "").lower()),
+                    level[0] if level else None,
+                )
+                start_url = str((target or {}).get("url") or "")
+        elif root:
+            start_url = str(root[0].get("url") or "")
+        if not start_url:
+            return {"items": []}
+        found = _collect_pages(addon_id, start_url,
+                               max_pages=max(1, min(pages, 30)))
+    except Exception:
+        return {"items": []}
+
+    out = []
+    seen = set()
+    for it in found:
+        item_url = str(it.get("url") or "")
+        if not ("function=showHosters" in item_url
+                or "function=showSeasons" in item_url
+                or item_url.startswith(("http://", "https://"))):
+            continue
+        title = re.sub(r"\[I\].*?\[/I\]", "", str(it.get("title") or "")).strip()
+        title = re.sub(r"\s*\(\d{4}\)\s*$", "", title).strip()
+        if not title or title.lower().startswith("nächste Seite"):
+            continue
+        key = re.sub(r"[^a-z0-9]", "", title.lower())
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        year = str(it.get("year") or it.get("sYear") or "") or None
+        out.append({
+            "title": title,
+            "year": year,
+            "poster_url": str(it.get("thumb") or it.get("trumb") or ""),
+            "url": str(it.get("url") or ""),
+            "media_type": type,
+            "source": site,
+        })
+    _TMDB_CACHE[cache_key] = out
+    return {"items": out, "count": len(out)}
+
+
 @app.get("/addon/browse")
 def addon_browse(addon: str = Query("xstream"), url: str = Query(None), query: str = Query(None)):
     addon_id = "plugin.video.xstream" if addon == "xstream" else "plugin.video.xship"

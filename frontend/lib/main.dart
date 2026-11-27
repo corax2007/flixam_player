@@ -103,6 +103,13 @@ class _HomePageState extends State<HomePage> {
   bool showSourceEpisodes = false;
   bool showProviderNew = false;
   bool providerNewLoading = false;
+  bool showAddonCatalog = false;
+  bool addonCatalogLoading = false;
+  List<dynamic> addonSites = [];
+  String? addonCatalogSite;
+  String addonCatalogType = 'movie';
+  int addonCatalogPages = 10;
+  List<dynamic> addonCatalogItems = [];
   bool showNewSeries = false;
   bool newSeriesOriginals = true;
   bool newSeriesLoading = false;
@@ -1089,6 +1096,14 @@ class _HomePageState extends State<HomePage> {
             TextButton.icon(
               onPressed: () async {
                 Navigator.of(context).pop();
+                await _toggleAddonCatalog();
+              },
+              icon: const Icon(Icons.storage, size: 15),
+              label: const Text('Addon-Bestand'),
+            ),
+            TextButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
                 await _toggleProviderNew();
               },
               icon: const Icon(Icons.new_releases, size: 15),
@@ -2047,6 +2062,174 @@ class _HomePageState extends State<HomePage> {
         ),
       ));
     }
+    return list;
+  }
+
+  Future<void> _loadAddonCatalog({bool more = false}) async {
+    if (addonCatalogSite == null || addonCatalogSite!.isEmpty) return;
+    if (!more) {
+      setState(() {
+        addonCatalogPages = 10;
+        addonCatalogItems = [];
+        addonCatalogLoading = true;
+      });
+    } else {
+      setState(() {
+        addonCatalogPages += 10;
+        addonCatalogLoading = true;
+      });
+    }
+    final items = await api.addonCatalog(
+      addonCatalogSite!,
+      addonCatalogType,
+      pages: addonCatalogPages,
+    );
+    if (mounted) {
+      setState(() {
+        addonCatalogItems = items;
+        addonCatalogLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleAddonCatalog() async {
+    if (showAddonCatalog) {
+      setState(() => showAddonCatalog = false);
+      return;
+    }
+    setState(() {
+      showAddonCatalog = true;
+      showNewSeries = false;
+      showProviderNew = false;
+      showFavorites = false;
+      showSourceEpisodes = false;
+      showHome = false;
+      heroItem = null;
+    });
+    if (addonSites.isEmpty) {
+      final sites = await api.addonCatalogSites();
+      if (mounted) setState(() => addonSites = sites);
+      if (sites.isNotEmpty && addonCatalogSite == null) {
+        addonCatalogSite = sites.first.toString();
+      }
+    }
+    if (addonCatalogSite != null) await _loadAddonCatalog();
+  }
+
+  List<Widget> _buildAddonCatalogSlivers() {
+    final list = <Widget>[
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Addon-Bestand'
+                  '${addonCatalogSite != null ? ' · $addonCatalogSite' : ''}',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() => showAddonCatalog = false),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ];
+    if (addonSites.isEmpty) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Keine Addon-Quellen gefunden.'),
+        ),
+      ));
+      return list;
+    }
+    list.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            DropdownButton<String>(
+              value: addonCatalogSite,
+              items: [
+                for (final site in addonSites)
+                  DropdownMenuItem<String>(
+                    value: site.toString(),
+                    child: Text(site.toString()),
+                  ),
+              ],
+              onChanged: (v) async {
+                setState(() => addonCatalogSite = v);
+                await _loadAddonCatalog();
+              },
+            ),
+            ChoiceChip(
+              label: const Text('Filme'),
+              selected: addonCatalogType == 'movie',
+              onSelected: (_) async {
+                setState(() => addonCatalogType = 'movie');
+                await _loadAddonCatalog();
+              },
+            ),
+            ChoiceChip(
+              label: const Text('Serien'),
+              selected: addonCatalogType == 'tv',
+              onSelected: (_) async {
+                setState(() => addonCatalogType = 'tv');
+                await _loadAddonCatalog();
+              },
+            ),
+            if (!addonCatalogLoading && addonCatalogItems.isNotEmpty)
+              ActionChip(
+                label: const Text('mehr'),
+                onPressed: () => _loadAddonCatalog(more: true),
+              ),
+          ],
+        ),
+      ),
+    ));
+    if (addonCatalogLoading) {
+      list.add(const SliverToBoxAdapter(
+        child: SizedBox(
+          height: 160,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ));
+      return list;
+    }
+    if (addonCatalogItems.isEmpty) {
+      list.add(const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Keine Titel in dieser Quelle gefunden.'),
+        ),
+      ));
+      return list;
+    }
+    final items = _availabilityFiltered(_langFiltered(addonCatalogItems));
+    list.add(SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 140,
+          childAspectRatio: 2 / 3,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (ctx, i) => _homeItemCard(items[i], autofocus: i == 0),
+          childCount: items.length,
+        ),
+      ),
+    ));
     return list;
   }
 
@@ -3452,8 +3635,10 @@ class _HomePageState extends State<HomePage> {
           _aetherNavItem(Icons.search, 'Suche',
               active: false, onTap: () => _search()),
           _aetherNavItem(Icons.movie_outlined, 'Filme',
-              active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showSourceEpisodes,
+              active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showAddonCatalog && !showSourceEpisodes,
               onTap: _browseRoot),
+          _aetherNavItem(Icons.storage, 'Addon-Bestand',
+              active: showAddonCatalog, onTap: _toggleAddonCatalog),
           _aetherNavItem(Icons.new_releases, 'Neu bei Anbietern',
               active: showProviderNew, onTap: _toggleProviderNew),
           _aetherNavItem(Icons.tv_outlined, 'Neue Serien',
@@ -3710,6 +3895,7 @@ class _HomePageState extends State<HomePage> {
                   myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
                   myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
                 ),
+              if (showAddonCatalog) ..._buildAddonCatalogSlivers(),
               if (showNewSeries) ..._buildNewSeriesSlivers(),
               if (showProviderNew) ..._buildProviderNewSlivers(),
               if (showFavorites) ..._buildFavoriteSlivers(),

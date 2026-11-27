@@ -48,6 +48,38 @@ class ApiService {
     );
   }
 
+  Future<List<dynamic>> addonCatalogSites() async {
+    if (useDirect) return [];
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/addon/catalog/sites'))
+          .timeout(const Duration(seconds: 30));
+      final j = jsonDecode(r.body) as Map<String, dynamic>;
+      return (j['sites'] as List?) ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<dynamic>> addonCatalog(
+    String site,
+    String type, {
+    int pages = 10,
+  }) async {
+    if (useDirect) return [];
+    try {
+      final r = await http.get(
+        Uri.parse(
+          '$baseUrl/addon/catalog?site=${Uri.encodeComponent(site)}'
+          '&type=$type&pages=$pages',
+        ),
+      ).timeout(const Duration(seconds: 240));
+      final j = jsonDecode(r.body) as Map<String, dynamic>;
+      return (j['items'] as List?) ?? [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<List<dynamic>> browse(String addon, {String? url}) async {
     final uri = Uri.parse('$baseUrl/addon/browse').replace(
       queryParameters: {
