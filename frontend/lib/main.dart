@@ -1168,8 +1168,10 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(height: 8),
                         Text('wireproxy läuft: ${File('/home/joerg/flixam_player/vpn/wireproxy').existsSync() ? 'ja' : 'nein'}'),
                         if (!hasVpnConfig)
-                          const Text('wg0.conf fehlt oder ist unvollständig.',
-                              style: TextStyle(color: Colors.orange)),
+                          const Text(
+                            'wg0.conf nicht mit echten Zugangsdaten befüllt.',
+                            style: TextStyle(color: Colors.orange),
+                          ),
                         const SizedBox(height: 12),
                         CupertinoButton(
                           onPressed: () => _importConf(),
@@ -1529,14 +1531,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-  }
-
-  bool _wgConfigured() {
-    final home = Platform.environment['HOME'] ?? '';
-    final f = File('$home/flixam_player/vpn/wg0.conf');
-    if (!f.existsSync()) return false;
-    final c = f.readAsStringSync();
-    return !c.contains('REPLACE_WITH');
   }
 
   Future<void> _loadStreamingProviders() async {
@@ -3299,15 +3293,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               )
               ],
-              if (!Platform.isAndroid && !_wgConfigured())
-                SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    padding: const EdgeInsets.all(8),
-                    color: Colors.orange.shade900,
-                    child: const Text('wg0.conf nicht mit echten Zugangsdaten befuellt.'),
-                  ),
-                ),
               if (!showHome && heroItem != null && appSettings.heroInBrowse)
                 _heroBanner(
                   (heroItem as Map).cast<String, dynamic>(),
