@@ -36,6 +36,7 @@ class SiteScrapers {
   }) =>
       {
         'title': title,
+        'original_language': 'de',
         'url': 'flixam://site/${Uri.encodeComponent(detailUrl)}?source=$source',
         'detail_url': detailUrl,
         'poster_url': poster,

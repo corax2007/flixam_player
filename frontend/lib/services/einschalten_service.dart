@@ -41,6 +41,7 @@ class EinschaltenService {
         if (!seen.add(id)) continue;
         out.add({
           'title': title,
+          'original_language': 'de',
           'year': date.isEmpty ? null : date.split('-').first,
           'poster_url': poster.isNotEmpty ? '$imgBase$poster' : '',
           'backdrop_url': poster.isNotEmpty ? '$imgBase$poster' : '',

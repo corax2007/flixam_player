@@ -108,6 +108,9 @@ class _HomePageState extends State<HomePage> {
   bool newSeriesLoading = false;
   List<dynamic> newSeriesGroups = [];
   List<dynamic> providerNewGroups = [];
+  final Set<int> _expandedSeries = {};
+  final Map<int, List<dynamic>> _seriesMoreItems = {};
+  final Set<int> _seriesMoreLoading = {};
   final Set<int> _expandedProviders = {};
   final Map<int, List<dynamic>> _providerMoreItems = {};
   final Set<int> _providerMoreLoading = {};
@@ -1099,6 +1102,30 @@ class _HomePageState extends State<HomePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Text('Nur deutsche Titel'),
+                                Text(
+                                  'Englische Filme & Serien überall ausblenden',
+                                  style: TextStyle(fontSize: 10, color: Colors.white54),
+                                ),
+                              ],
+                            ),
+                          ),
+                          CupertinoSwitch(
+                            value: appSettings.onlyGerman,
+                            onChanged: (v) async {
+                              setState(() => appSettings.onlyGerman = v);
+                              await appSettings.save();
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text('Staffel ohne Pause abspielen'),
                                 Text(
                                   'Folgen automatisch nacheinander',
@@ -1394,6 +1421,25 @@ class _HomePageState extends State<HomePage> {
     if (newSeriesGroups.isEmpty) await _loadNewSeries();
   }
 
+  Future<void> _toggleSeriesMore(dynamic group) async {
+    final id = int.tryParse(group['id']?.toString() ?? '') ?? 0;
+    if (_expandedSeries.contains(id)) {
+      setState(() => _expandedSeries.remove(id));
+      return;
+    }
+    setState(() {
+      _expandedSeries.add(id);
+      _seriesMoreLoading.add(id);
+    });
+    if (!_seriesMoreItems.containsKey(id)) {
+      try {
+        final items = await api.seriesNetworkItems(id, limit: 60);
+        if (mounted) setState(() => _seriesMoreItems[id] = items);
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _seriesMoreLoading.remove(id));
+  }
+
   List<Widget> _buildNewSeriesSlivers() {
     final list = <Widget>[
       SliverToBoxAdapter(
@@ -1445,11 +1491,11 @@ class _HomePageState extends State<HomePage> {
       return list;
     }
     for (final g in newSeriesGroups) {
-      final items = ((g['items'] as List?) ?? [])
+      final items = _langFiltered(((g['items'] as List?) ?? [])
           .whereType<Map>()
-          .map((m) => m.cast<String, dynamic>())
-          .toList();
+          .map((m) => m.cast<String, dynamic>()));
       if (items.isEmpty) continue;
+      final finalSid = int.tryParse(g['id']?.toString() ?? '') ?? 0;
       list.add(SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
@@ -1464,10 +1510,27 @@ class _HomePageState extends State<HomePage> {
                       fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ),
+              if (_seriesMoreLoading.contains(finalSid))
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                TextButton(
+                  onPressed: () => _toggleSeriesMore(g),
+                  child: Text(_expandedSeries.contains(finalSid)
+                      ? 'weniger'
+                      : 'mehr'),
+                ),
             ],
           ),
         ),
       ));
+      final showAll = _expandedSeries.contains(finalSid);
+      final all = showAll
+          ? _langFiltered(_seriesMoreItems[finalSid] ?? items)
+          : items;
       list.add(SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         sliver: SliverGrid(
@@ -1478,8 +1541,8 @@ class _HomePageState extends State<HomePage> {
             mainAxisSpacing: 10,
           ),
           delegate: SliverChildBuilderDelegate(
-            (ctx, i) => _homeItemCard(items[i], autofocus: i == 0),
-            childCount: items.length,
+            (ctx, i) => _homeItemCard(all[i], autofocus: i == 0),
+            childCount: all.length,
           ),
         ),
       ));
@@ -1572,10 +1635,9 @@ class _HomePageState extends State<HomePage> {
       ),
     ];
     for (final g in providerNewGroups) {
-      final items = ((g['items'] as List?) ?? [])
+      final items = _langFiltered(((g['items'] as List?) ?? [])
           .whereType<Map>()
-          .map((m) => m.cast<String, dynamic>())
-          .toList();
+          .map((m) => m.cast<String, dynamic>()));
       if (items.isEmpty) continue;
       final pid = int.tryParse(g['id']?.toString() ?? '') ?? 0;
       final expanded = _expandedProviders.contains(pid);
@@ -2044,9 +2106,21 @@ class _HomePageState extends State<HomePage> {
     return int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), '')) ?? -1;
   }
 
+  bool _langOk(dynamic item) {
+    if (!appSettings.onlyGerman) return true;
+    if (item is! Map) return false;
+    final lang = item['original_language']?.toString() ?? '';
+    // Lokale Quellen sind als 'de' markiert; alles andere wird ausgeblendet.
+    return lang == 'de';
+  }
+
+  List<dynamic> _langFiltered(Iterable<dynamic> items) =>
+      items.where(_langOk).toList();
+
   Future<List<dynamic>> _applyFilters(List<dynamic> input, {bool skipFsk = false}) async {
     final year = yearCtrl.text.trim();
     var out = input.where((i) {
+      if (!_langOk(i)) return false;
       if (i is! Map) return false;
       if (year.isNotEmpty && (i['year']?.toString() ?? '') != year) return false;
       if (monthFilter != 'Alle') {
@@ -2436,7 +2510,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   List<Widget> _buildFavoriteSlivers() {
-    final items = prefs.favoriteList();
+    final items = _langFiltered(prefs.favoriteList());
     return [
       SliverToBoxAdapter(
         child: Padding(
@@ -2487,6 +2561,7 @@ class _HomePageState extends State<HomePage> {
   List<Widget> _buildHomeSlivers() {
     if (selectedProviderId != null) {
       final visible = providerMovies.where((i) {
+        if (!_langOk(i)) return false;
         if (providerFilter == 'Alle') return true;
         final type = (i as Map)['media_type']?.toString();
         return type == (providerFilter == 'Filme' ? 'movie' : 'tv');
@@ -2618,7 +2693,7 @@ class _HomePageState extends State<HomePage> {
 
     for (final section in (data['sections'] as List?) ?? []) {
       final title = section['title']?.toString() ?? '';
-      final items = (section['items'] as List?) ?? [];
+      final items = _langFiltered((section['items'] as List?) ?? []);
       final expanded = expandedSection == title ||
           fskFilter != 'Alle' ||
           yearCtrl.text.trim().isNotEmpty ||

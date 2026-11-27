@@ -11,6 +11,7 @@ class AppSettings {
   bool autoPlaySeason;
   int design;
   int layout;
+  bool onlyGerman;
   String backendUrl;
 
   static const String defaultBackendUrl = String.fromEnvironment(
@@ -27,6 +28,7 @@ class AppSettings {
     this.autoPlaySeason = false,
     this.design = 0,
     this.layout = 0,
+    this.onlyGerman = false,
     this.backendUrl = defaultBackendUrl,
   });
 
@@ -49,6 +51,7 @@ class AppSettings {
           autoPlaySeason: map['autoPlaySeason'] as bool? ?? false,
           design: val('design', 0),
           layout: val('layout', 0),
+          onlyGerman: map['onlyGerman'] as bool? ?? false,
           backendUrl: map['backendUrl']?.toString().isNotEmpty ?? false
               ? map['backendUrl'].toString()
               : defaultBackendUrl,
@@ -69,6 +72,7 @@ class AppSettings {
         'autoPlaySeason': autoPlaySeason,
         'design': design,
         'layout': layout,
+        'onlyGerman': onlyGerman,
         'backendUrl': backendUrl,
       }));
     } catch (_) {}

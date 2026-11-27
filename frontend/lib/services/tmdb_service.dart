@@ -94,6 +94,7 @@ class TmdbService {
       'overview': res['overview']?.toString() ?? '',
       'media_type': mt,
       'genres': await genreNames(genreIds, mt),
+      'original_language': res['original_language']?.toString() ?? '',
     };
   }
 
@@ -266,6 +267,33 @@ class TmdbService {
     }
     _cache[key] = out;
     return out;
+  }
+
+  /// Alle neuesten Serien eines Netzwerks (fuer das "mehr").
+  Future<List<Map<String, dynamic>>> seriesNetworkItems(
+    int id, {
+    int limit = 60,
+  }) async {
+    final out = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    for (var page = 1; page <= 2; page++) {
+      final data = await _get('discover/tv', {
+        'with_networks': id,
+        'sort_by': 'first_air_date.desc',
+        'page': page,
+      }) ?? {};
+      for (final r in (data['results'] as List?) ?? []) {
+        final it = await toItem(r, 'tv');
+        if (it == null) continue;
+        if ((it['poster_url']?.toString() ?? '').isEmpty) continue;
+        final year = int.tryParse(it['year']?.toString() ?? '') ?? 9999;
+        if (year > DateTime.now().year) continue;
+        if (seen.add(it['title'].toString())) out.add(it);
+        if (out.length >= limit) break;
+      }
+      if (out.length >= limit) break;
+    }
+    return out.take(limit).toList();
   }
 
   /// Neueste Serien - nur Eigenproduktionen der grossen Dienste.

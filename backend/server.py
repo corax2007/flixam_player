@@ -305,6 +305,7 @@ def _tmdb_to_item(res: dict, media_type: str | None = None):
         "overview": res.get("overview") or "",
         "media_type": mt,
         "genres": genres,
+        "original_language": res.get("original_language") or "",
     }
 
 
@@ -898,6 +899,45 @@ ORIGINAL_NETWORKS = [
     {"id": 1024, "name": "Prime Video"},
     {"id": 49, "name": "HBO / Max"},
 ]
+
+
+@app.get("/tmdb/series/network")
+def tmdb_series_network(id: str = Query(""), limit: int = 60):
+    """Alle neuesten Serien eines Netzwerks (fuer "mehr")."""
+    if not id:
+        return {"items": []}
+    cache_key = f"series|network|{id}|{limit}"
+    if cache_key in _TMDB_CACHE:
+        return {"items": _TMDB_CACHE[cache_key]}
+    out = []
+    seen = set()
+    from datetime import date as _date
+    for page in (1, 2):
+        data = _tmdb_get("discover/tv", {
+            "with_networks": id,
+            "sort_by": "first_air_date.desc",
+            "page": page,
+        }) or {}
+        results = data.get("results") or []
+        if not results:
+            break
+        for r in results:
+            item = _tmdb_to_item(r, "tv")
+            if not item or not item.get("title") or not item.get("poster_url"):
+                continue
+            try:
+                if int(item.get("year") or 9999) > _date.today().year:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            if item["title"] not in seen:
+                seen.add(item["title"])
+                out.append(item)
+        if len(out) >= limit or page >= min(int(data.get("total_pages") or 1), 2):
+            break
+    out = out[:limit]
+    _TMDB_CACHE[cache_key] = out
+    return {"items": out}
 
 
 @app.get("/tmdb/series/new")

@@ -94,6 +94,7 @@ class CustomSources {
           }
           out.add({
             'title': title,
+            'original_language': 'de',
             'year': group('year').isEmpty ? null : group('year'),
             'poster_url': group('poster'),
             'backdrop_url': group('poster'),

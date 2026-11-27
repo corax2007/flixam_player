@@ -43,6 +43,7 @@ class NetzkinoService {
         final cover = (n['coverImage'] as Map<String, dynamic>?)?['masterUrl']?.toString() ?? '';
         out.add({
           'title': n['title']?.toString() ?? '',
+          'original_language': 'de',
           'year': n['productionYear']?.toString(),
           'poster_url': cover,
           'backdrop_url': cover,

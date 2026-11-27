@@ -41,6 +41,7 @@ class GezKinoService {
       if (!video.startsWith('http')) continue;
       out.add({
         'title': title,
+        'original_language': 'de',
         'year': m['year']?.toString(),
         'poster_url': m['thumb']?.toString() ?? '',
         'backdrop_url': m['thumb']?.toString() ?? '',

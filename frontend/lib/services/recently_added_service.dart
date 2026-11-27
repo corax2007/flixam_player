@@ -28,6 +28,7 @@ class RecentlyAddedService {
         if (!video.startsWith('http')) continue;
         out.add({
           'title': m['title']?.toString() ?? '',
+          'original_language': 'de',
           'year': m['year']?.toString(),
           'poster_url': m['thumb']?.toString() ?? '',
           'backdrop_url': m['thumb']?.toString() ?? '',
@@ -60,6 +61,7 @@ class RecentlyAddedService {
           final poster = m['posterPath']?.toString() ?? '';
           out.add({
             'title': m['title']?.toString() ?? '',
+            'original_language': 'de',
             'year': (m['releaseDate']?.toString() ?? '').isEmpty
                 ? null
                 : m['releaseDate'].toString().substring(0, 4),
