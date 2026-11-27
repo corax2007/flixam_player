@@ -106,6 +106,7 @@ class _HomePageState extends State<HomePage> {
   bool showLiveTv = false;
   bool liveLoading = false;
   List<dynamic> liveChannels = [];
+  Map<String, dynamic> liveEpg = {};
   int liveCategory = 0;
   bool liveMultiSelect = false;
   final Set<String> liveSelected = {};
@@ -2192,8 +2193,14 @@ class _HomePageState extends State<HomePage> {
           liveChannels = channels;
           liveLoading = false;
         });
+        _loadLiveEpg();
       }
     }
+  }
+
+  Future<void> _loadLiveEpg() async {
+    final epg = await api.vavooEpg();
+    if (mounted) setState(() => liveEpg = epg);
   }
 
   List<dynamic> _filteredLiveChannels() {
@@ -2426,11 +2433,29 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                          if (liveEpg[title] != null)
+                            Text(
+                              'Jetzt: ${liveEpg[title]['title']} · '
+                              '${liveEpg[title]['start']}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: accent(context),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     IconButton(

@@ -544,6 +544,137 @@ ADDON_CATALOG_SITES = [
 ]
 
 
+_EPG_SOURCES = [
+    "https://open-epg.com/files/germany.xml.gz",
+    "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz",
+]
+_EPG_CACHE_PATH = os.path.join(
+    os.path.dirname(BASE_DIR), ".flixam_epg_cache.json"
+)
+
+
+def _epg_norm(value: str) -> str:
+    import unicodedata
+    v = str(value or "").lower()
+    v = re.sub(r"\[i\].*?\[/i\]", "", v)
+    v = "".join(
+        c for c in unicodedata.normalize("NFKD", v)
+        if not unicodedata.combining(c)
+    )
+    v = v.replace("ae", "a").replace("oe", "o").replace("ue", "u").replace("ss", "s")
+    v = re.sub(r"\.(de|at|ch|com|info|tv)$", "", v)
+    v = re.sub(r"\b(hd|sd|raw|backup|store)\b", "", v)
+    return re.sub(r"[^a-z0-9]", "", v)
+
+
+def _epg_load() -> dict:
+    """EPG-Dateien laden und auf einen Tag cachen."""
+    import gzip
+    import time as _time
+    import xml.etree.ElementTree as ET
+    try:
+        if os.path.isfile(_EPG_CACHE_PATH):
+            data = json.load(open(_EPG_CACHE_PATH, "r", encoding="utf-8"))
+            if _time.time() - float(data.get("time") or 0) < 20 * 3600:
+                return data.get("channels") or {}
+    except Exception:
+        pass
+
+    channels = {}
+    for url in _EPG_SOURCES:
+        try:
+            r = requests.get(url, timeout=90)
+            if r.status_code != 200:
+                continue
+            xml_data = gzip.decompress(r.content) if url.endswith(".gz") else r.content
+            root = ET.fromstring(xml_data)
+            names = {}
+            cid_to_name = {}
+            for ch in root.findall("channel"):
+                cid = str(ch.get("id") or "")
+                display = []
+                for dn in ch.findall("display-name"):
+                    t = str(dn.text or "").strip()
+                    if t:
+                        display.append(t)
+                if not display:
+                    continue
+                cid_to_name[cid] = display[0]
+                for name in display:
+                    key = _epg_norm(name)
+                    if key:
+                        names[key] = display[0]
+            programmes = {}
+            for pr in root.findall("programme"):
+                cid = str(pr.get("channel") or "")
+                if cid not in cid_to_name:
+                    continue
+                title_el = pr.find("title")
+                title = str(title_el.text or "").strip() if title_el is not None else ""
+                if not title:
+                    continue
+                desc_el = pr.find("desc")
+                desc = str(desc_el.text or "").strip() if desc_el is not None else ""
+                start = str(pr.get("start") or "")
+                stop = str(pr.get("stop") or "")
+                programmes.setdefault(cid_to_name[cid], []).append((start, stop, title, desc))
+            for name, entries in programmes.items():
+                channels.setdefault(_epg_norm(name), []).extend(entries)
+        except Exception:
+            continue
+    try:
+        json.dump(
+            {"time": _time.time(), "channels": channels},
+            open(_EPG_CACHE_PATH, "w", encoding="utf-8"),
+        )
+    except Exception:
+        pass
+    return channels
+
+
+@app.get("/vavoo/epg")
+def vavoo_epg():
+    """Laufendes Programm für die Vavoo-Sender (Open-EPG / epgshare01)."""
+    from datetime import datetime
+    channels = _epg_load()
+    if not channels:
+        return {"programs": {}, "count": 0}
+    vavoo = (vavoo_channels().get("channels") or [])
+    now = datetime.now()
+    out = {}
+    for ch in vavoo:
+        title = ch.get("title") or ""
+        key = _epg_norm(title)
+        entries = channels.get(key)
+        if not entries:
+            # Teilweise Uebereinstimmung (z. B. "Sky Bundesliga 1 HD (Backup)")
+            if len(key) >= 6:
+                for k, v in channels.items():
+                    if (len(k) >= 6 and (k in key or key in k)):
+                        entries = v
+                        break
+        if not entries:
+            continue
+        current = None
+        for start, stop, name, desc in entries:
+            try:
+                s = datetime.strptime(start[:14], "%Y%m%d%H%M%S")
+                e = datetime.strptime(stop[:14], "%Y%m%d%H%M%S")
+            except (TypeError, ValueError):
+                continue
+            if s <= now < e:
+                current = {
+                    "title": name,
+                    "start": s.strftime("%H:%M"),
+                    "end": e.strftime("%H:%M"),
+                    "description": desc[:300],
+                }
+                break
+        if current:
+            out[title] = current
+    return {"programs": out, "count": len(out)}
+
+
 @app.get("/vavoo/channels")
 def vavoo_channels():
     """Live-TV-Senderliste aus dem Vavoo-Addon (DE)."""
