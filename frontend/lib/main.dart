@@ -1096,28 +1096,32 @@ class _HomePageState extends State<HomePage> {
                         child: const Text('Cache-Einstellungen speichern'),
                       ),
                       const SizedBox(height: 12),
-                      Row(
+                      const Text('Sprache der Titel',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
                         children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Nur deutsche Titel'),
-                                Text(
-                                  'Englische Filme & Serien überall ausblenden',
-                                  style: TextStyle(fontSize: 10, color: Colors.white54),
-                                ),
-                              ],
+                          for (final mode in [0, 1, 2])
+                            ChoiceChip(
+                              label: Text(
+                                ['Alle', 'Nur Deutsch', 'Nur Englisch'][mode],
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              selected: appSettings.languageMode == mode,
+                              onSelected: (_) async {
+                                setState(() {
+                                  appSettings.languageMode = mode;
+                                  appSettings.onlyGerman = mode == 1;
+                                });
+                                await appSettings.save();
+                              },
                             ),
-                          ),
-                          CupertinoSwitch(
-                            value: appSettings.onlyGerman,
-                            onChanged: (v) async {
-                              setState(() => appSettings.onlyGerman = v);
-                              await appSettings.save();
-                            },
-                          ),
                         ],
+                      ),
+                      const Text(
+                        'Filter nach Originalsprache - gilt überall für Filme und Serien',
+                        style: TextStyle(fontSize: 10, color: Colors.white54),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -2107,11 +2111,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   bool _langOk(dynamic item) {
-    if (!appSettings.onlyGerman) return true;
+    final mode = appSettings.languageMode;
+    if (mode == 0) return true;
     if (item is! Map) return false;
     final lang = item['original_language']?.toString() ?? '';
-    // Lokale Quellen sind als 'de' markiert; alles andere wird ausgeblendet.
-    return lang == 'de';
+    // Lokale deutsche Quellen sind als 'de' markiert.
+    if (mode == 1) return lang == 'de';
+    return lang == 'en';
   }
 
   List<dynamic> _langFiltered(Iterable<dynamic> items) =>
