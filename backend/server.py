@@ -898,6 +898,7 @@ ORIGINAL_NETWORKS = [
     {"id": 2739, "name": "Disney+"},
     {"id": 1024, "name": "Prime Video"},
     {"id": 49, "name": "HBO / Max"},
+    {"id": 4330, "name": "Paramount+"},
 ]
 
 
@@ -915,7 +916,11 @@ def tmdb_series_network(id: str = Query(""), limit: int = 60,
     from datetime import date as _date
     # Zwei Sortierungen kombinieren: neueste AND bekannte Originale,
     # sonst fehlen Titel, die nur auf spaeteren Datum-Seiten liegen.
-    for sort_by, pages in (("first_air_date.desc", 10), ("popularity.desc", 5)):
+    if year.isdigit():
+        sort_plan = (("popularity.desc", 15),)
+    else:
+        sort_plan = (("first_air_date.desc", 10), ("popularity.desc", 5))
+    for sort_by, pages in sort_plan:
         for page in range(1, pages + 1):
             params = {
                 "with_networks": id,

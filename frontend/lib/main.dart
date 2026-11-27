@@ -1834,7 +1834,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final items = await api.seriesNetworkItems(
         id,
-        limit: 200,
+        limit: year == 'Alle' ? 200 : 300,
         year: year,
       );
       if (mounted) setState(() => _seriesMoreItems[id] = items);

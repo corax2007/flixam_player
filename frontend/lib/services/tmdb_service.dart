@@ -277,10 +277,15 @@ class TmdbService {
   }) async {
     final out = <Map<String, dynamic>>[];
     final seen = <String>{};
-    for (final entry in [
-      {'sort': 'first_air_date.desc', 'pages': 10},
-      {'sort': 'popularity.desc', 'pages': 5},
-    ]) {
+    final plan = year.isNotEmpty
+        ? [
+            {'sort': 'popularity.desc', 'pages': 15},
+          ]
+        : [
+            {'sort': 'first_air_date.desc', 'pages': 10},
+            {'sort': 'popularity.desc', 'pages': 5},
+          ];
+    for (final entry in plan) {
       for (var page = 1; page <= (entry['pages'] as int); page++) {
         final params = <String, dynamic>{
           'with_networks': id,
@@ -321,6 +326,7 @@ class TmdbService {
             {'id': 2739, 'name': 'Disney+'},
             {'id': 1024, 'name': 'Prime Video'},
             {'id': 49, 'name': 'HBO / Max'},
+            {'id': 4330, 'name': 'Paramount+'},
           ]
         : const [
             {'id': null, 'name': 'Neu im Streaming'},
