@@ -193,10 +193,6 @@ class _HomePageState extends State<HomePage> {
   final List<String> _queueTitles = [];
   final List<Map<String, dynamic>> _episodeQueue = [];
   int _episodeIndex = 0;
-  bool showNextCountdown = false;
-  bool _nextPromptShown = false;
-  int nextCountdown = 0;
-  Timer? _nextTimer;
   List<Map<String, String>> heroSources = [];
   String? heroTrailerKey;
   bool heroSourcesLoading = false;
@@ -219,19 +215,6 @@ class _HomePageState extends State<HomePage> {
     player.stream.position.listen((p) {
       if (!mounted) return;
       setState(() => playerPosition = p);
-      // Konfigurierbare Zeit vor Ende - der Abspann wird übersprungen.
-      final rest = playerDuration - p;
-      final lead = appSettings.autoPlayLeadSeconds;
-      if (_episodeQueue.isNotEmpty &&
-          _episodeIndex < _episodeQueue.length &&
-          !_nextPromptShown &&
-          lead > 0 &&
-          playerDuration.inSeconds > lead + 30 &&
-          rest <= Duration(seconds: lead) &&
-          rest > Duration.zero) {
-        _nextPromptShown = true;
-        _startNextCountdown();
-      }
       if (currentPlayingTitle != null && p.inSeconds - _lastSavedSecond >= 10) {
         _lastSavedSecond = p.inSeconds;
         prefs.savePosition(currentPlayingTitle!, p.inSeconds);
@@ -253,10 +236,8 @@ class _HomePageState extends State<HomePage> {
       if (currentPlayingTitle != null) {
         prefs.savePosition(currentPlayingTitle!, 0);
       }
-      if (!_nextPromptShown &&
-          _episodeQueue.isNotEmpty &&
-          _episodeIndex < _episodeQueue.length) {
-        _startNextCountdown();
+      if (_episodeQueue.isNotEmpty && _episodeIndex < _episodeQueue.length) {
+        _playNextEpisode();
       }
     });
     // Bei mehreren Folgen in der Wiedergabeliste Titel/Position pro Folge
@@ -692,8 +673,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _play(String url, String title, {bool resume = false}) async {
     playerFromLive = false;
-    _nextTimer?.cancel();
-    showNextCountdown = false;
     _episodeQueue.clear();
     _episodeIndex = 0;
     // Alte Favoriten/Items können Dart-URLs enthalten - das Linux-Backend
@@ -732,7 +711,6 @@ class _HomePageState extends State<HomePage> {
     String title, {
     bool resume = false,
   }) async {
-    _nextPromptShown = false;
     if (vpnEnabled) {
       try {
         (player.platform as dynamic)?.setProperty?.call('http-proxy', 'http://127.0.0.1:8080');
@@ -797,29 +775,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _startNextCountdown() {
-    if (appSettings.autoPlayDelay <= 0) {
-      _playNextEpisode();
-      return;
-    }
-    if (showNextCountdown) return;
-    setState(() {
-      nextCountdown = appSettings.autoPlayDelay;
-      showNextCountdown = true;
-    });
-    _nextTimer?.cancel();
-    _nextTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (nextCountdown <= 1) {
-        _nextTimer?.cancel();
-        showNextCountdown = false;
-        _playNextEpisode();
-      } else {
-        setState(() => nextCountdown--);
-      }
-    });
-  }
-
   Future<void> _playNextEpisode() async {
     if (_episodeIndex >= _episodeQueue.length) return;
     final item = _episodeQueue[_episodeIndex];
@@ -829,13 +784,6 @@ class _HomePageState extends State<HomePage> {
       Map<String, String>.from(item['headers'] ?? {}),
       item['title']?.toString() ?? 'Folge',
     );
-  }
-
-  void _cancelNextEpisode() {
-    _nextTimer?.cancel();
-    _nextPromptShown = true;
-    _episodeQueue.clear();
-    if (mounted) setState(() => showNextCountdown = false);
   }
 
   /// Folgen derselben Staffel ab der angeklickten Episode (Quellenansicht).
@@ -1512,51 +1460,6 @@ class _HomePageState extends State<HomePage> {
                     },
                     hint: 'Folgen automatisch nacheinander',
                   ),
-                  if (appSettings.autoPlaySeason) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ankündigung vor Ende: '
-                      '${appSettings.autoPlayLeadSeconds >= 60 ? '${appSettings.autoPlayLeadSeconds ~/ 60} min ${appSettings.autoPlayLeadSeconds % 60} s' : '${appSettings.autoPlayLeadSeconds} s'}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    Slider(
-                      value: appSettings.autoPlayLeadSeconds.toDouble(),
-                      min: 0,
-                      max: 600,
-                      divisions: 60,
-                      label: appSettings.autoPlayLeadSeconds >= 60
-                          ? '${appSettings.autoPlayLeadSeconds ~/ 60} min'
-                          : '${appSettings.autoPlayLeadSeconds} s',
-                      onChanged: (v) async {
-                        setState(() =>
-                            appSettings.autoPlayLeadSeconds = v.round());
-                        await appSettings.save();
-                      },
-                      onChangeEnd: (_) => settingsRevision.value++,
-                    ),
-                    Text(
-                      'Countdown: ${appSettings.autoPlayDelay == 0 ? 'sofort' : '${appSettings.autoPlayDelay} s'}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    Slider(
-                      value: appSettings.autoPlayDelay.toDouble(),
-                      min: 0,
-                      max: 30,
-                      divisions: 30,
-                      label: appSettings.autoPlayDelay == 0
-                          ? 'sofort'
-                          : '${appSettings.autoPlayDelay} s',
-                      onChanged: (v) async {
-                        setState(() => appSettings.autoPlayDelay = v.round());
-                        await appSettings.save();
-                      },
-                      onChangeEnd: (_) => settingsRevision.value++,
-                    ),
-                    const Text(
-                      '0 s Countdown = sofortiger Wechsel (Abspann wird übersprungen)',
-                      style: TextStyle(fontSize: 10, color: Colors.white54),
-                    ),
-                  ],
                   _settingsSwitch(
                     'Hero-Details beim Browse',
                     appSettings.heroInBrowse,
@@ -5290,82 +5193,6 @@ class _HomePageState extends State<HomePage> {
                         child: Video(controller: videoController, fit: BoxFit.contain),
                       ),
                     ),
-                    if (showNextCountdown &&
-                        _episodeIndex < _episodeQueue.length)
-                      Center(
-                        child: Container(
-                          width: 380,
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: const Color(0xEE171512),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFFD4AF6E).withValues(alpha: 0.6),
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Nächste Folge in $nextCountdown s',
-                                style: const TextStyle(
-                                  color: Color(0xFFD4AF6E),
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _episodeQueue[_episodeIndex]['title']?.toString() ??
-                                    '',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              LinearProgressIndicator(
-                                value: (1 -
-                                        nextCountdown /
-                                            (appSettings.autoPlayDelay <= 0
-                                                ? 10
-                                                : appSettings.autoPlayDelay))
-                                    .clamp(0.0, 1.0),
-                                minHeight: 4,
-                                color: const Color(0xFFD4AF6E),
-                                backgroundColor: Colors.white12,
-                              ),
-                              const SizedBox(height: 14),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton(
-                                    onPressed: _cancelNextEpisode,
-                                    child: const Text('Abbrechen'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD4AF6E),
-                                      foregroundColor: Colors.black,
-                                    ),
-                                    onPressed: () {
-                                      _nextTimer?.cancel();
-                                      setState(() =>
-                                          showNextCountdown = false);
-                                      _playNextEpisode();
-                                    },
-                                    child: const Text('Jetzt starten'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     Positioned(
                       top: 0,
                       left: 0,
@@ -5401,6 +5228,16 @@ class _HomePageState extends State<HomePage> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                if (_episodeQueue.isNotEmpty &&
+                                    _episodeIndex < _episodeQueue.length)
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: _playNextEpisode,
+                                    icon: const Icon(Icons.skip_next, size: 18),
+                                    label: const Text('Nächste Folge'),
+                                  ),
                                 IconButton(
                                   tooltip: playerVolume == 0 ? 'Ton an' : 'Stumm',
                                   icon: Icon(

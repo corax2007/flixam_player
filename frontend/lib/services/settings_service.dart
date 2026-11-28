@@ -15,8 +15,6 @@ class AppSettings {
   int languageMode;
   int availabilityMode;
   int viewMode;
-  int autoPlayDelay;
-  int autoPlayLeadSeconds;
   String backendUrl;
 
   static const String defaultBackendUrl = String.fromEnvironment(
@@ -37,8 +35,6 @@ class AppSettings {
     this.languageMode = 0,
     this.availabilityMode = 0,
     this.viewMode = 0,
-    this.autoPlayDelay = 10,
-    this.autoPlayLeadSeconds = 120,
     this.backendUrl = defaultBackendUrl,
   });
 
@@ -66,9 +62,6 @@ class AppSettings {
               ((map['onlyGerman'] as bool?) ?? false ? 1 : 0),
           availabilityMode: (map['availabilityMode'] as num?)?.toInt() ?? 0,
           viewMode: (map['viewMode'] as num?)?.toInt() ?? 0,
-          autoPlayDelay: (map['autoPlayDelay'] as num?)?.toInt() ?? 10,
-          autoPlayLeadSeconds:
-              (map['autoPlayLeadSeconds'] as num?)?.toInt() ?? 120,
           backendUrl: map['backendUrl']?.toString().isNotEmpty ?? false
               ? map['backendUrl'].toString()
               : defaultBackendUrl,
@@ -93,8 +86,6 @@ class AppSettings {
         'languageMode': languageMode,
         'availabilityMode': availabilityMode,
         'viewMode': viewMode,
-        'autoPlayDelay': autoPlayDelay,
-        'autoPlayLeadSeconds': autoPlayLeadSeconds,
         'backendUrl': backendUrl,
       }));
     } catch (_) {}
