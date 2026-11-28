@@ -4158,12 +4158,10 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   onTap: () {
-                    if (appSettings.autoPlaySeason) {
-                      final queue = _sourceFollowingEpisodes(ep);
-                      if (queue.isNotEmpty) {
-                        _playEpisodes(queue);
-                        return;
-                      }
+                    final queue = _sourceFollowingEpisodes(ep);
+                    if (queue.isNotEmpty) {
+                      _playEpisodes(queue);
+                      return;
                     }
                     _play(ep['url']?.toString() ?? '', epTitle,
                         resume: prefs.positionFor(epTitle) > 30);

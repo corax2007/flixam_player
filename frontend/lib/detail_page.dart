@@ -224,12 +224,10 @@ class _DetailPageState extends State<DetailPage> {
         ),
         trailing: IconButton(
           icon: Icon(Icons.play_circle_fill, color: accent(context), size: 28),
-          tooltip: widget.autoPlaySeason
-              ? 'Folge und Staffel abspielen'
-              : 'Folge abspielen',
+          tooltip: 'Folge abspielen',
           onPressed: () {
             final epTitle = ep['title']?.toString() ?? 'Folge';
-            if (widget.autoPlaySeason && widget.onPlayFromHere != null) {
+            if (widget.onPlayFromHere != null) {
               final queue = _followingEpisodes(ep, sameSeasonOnly: true);
               if (queue.isNotEmpty) {
                 widget.onPlayFromHere?.call(queue);
