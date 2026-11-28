@@ -263,6 +263,20 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _activateView(String view) {
+    setState(() {
+      showHome = view == 'home';
+      showFavorites = view == 'favorites';
+      showSourceEpisodes = view == 'source';
+      showProviderNew = view == 'provider';
+      showNewSeries = view == 'series';
+      showAddonCatalog = view == 'addon';
+      showLiveTv = view == 'live';
+      showDownloads = view == 'downloads';
+      if (view != 'home') heroItem = null;
+    });
+  }
+
   Future<void> _loadAvailability() async {
     try {
       await AvailabilityService.instance.load();
@@ -359,11 +373,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _goHome() async {
+    _activateView('home');
     setState(() {
-      showHome = true;
-      showFavorites = false;
-      showSourceEpisodes = false;
-      heroItem = null;
       heroSources = [];
       heroTrailerKey = null;
       _navStack.clear();
@@ -1190,9 +1201,7 @@ class _HomePageState extends State<HomePage> {
       {'icon': Icons.movie_outlined, 'label': 'Filme', 'tap': _browseRoot},
       {'icon': Icons.favorite_border, 'label': 'Favoriten', 'tap': () {
         setState(() {
-          showFavorites = !showFavorites;
-          showHome = false;
-          heroItem = null;
+          _activateView(showFavorites ? 'home' : 'favorites');
         });
       }},
       {'icon': Icons.settings_outlined, 'label': 'Einstellungen', 'tap': null},
@@ -1953,18 +1962,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleNewSeries() async {
     if (showNewSeries) {
-      setState(() => showNewSeries = false);
+      _activateView('home');
       return;
     }
-    setState(() {
-      searchCtrl.clear();
-      showNewSeries = true;
-      showProviderNew = false;
-      showFavorites = false;
-      showSourceEpisodes = false;
-      showHome = false;
-      heroItem = null;
-    });
+    searchCtrl.clear();
+    _activateView('series');
     if (newSeriesGroups.isEmpty) await _loadNewSeries();
   }
 
@@ -2223,20 +2225,10 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleDownloads() async {
     if (showDownloads) {
-      setState(() => showDownloads = false);
+      _activateView('home');
       return;
     }
-    setState(() {
-      showDownloads = true;
-      showHome = false;
-      showFavorites = false;
-      showProviderNew = false;
-      showNewSeries = false;
-      showAddonCatalog = false;
-      showLiveTv = false;
-      showSourceEpisodes = false;
-      heroItem = null;
-    });
+    _activateView('downloads');
     await _loadDownloads();
   }
 
@@ -2377,20 +2369,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleLiveTv() async {
     if (showLiveTv) {
-      setState(() => showLiveTv = false);
+      _activateView('home');
       return;
     }
-    setState(() {
-      searchCtrl.clear();
-      showLiveTv = true;
-      showAddonCatalog = false;
-      showNewSeries = false;
-      showProviderNew = false;
-      showFavorites = false;
-      showSourceEpisodes = false;
-      showHome = false;
-      heroItem = null;
-    });
+    searchCtrl.clear();
+    _activateView('live');
     if (liveChannels.isEmpty) {
       setState(() => liveLoading = true);
       final channels = await api.vavooChannels();
@@ -2707,19 +2690,11 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleAddonCatalog() async {
     if (showAddonCatalog) {
-      setState(() => showAddonCatalog = false);
+      _activateView('home');
       return;
     }
-    setState(() {
-      searchCtrl.clear();
-      showAddonCatalog = true;
-      showNewSeries = false;
-      showProviderNew = false;
-      showFavorites = false;
-      showSourceEpisodes = false;
-      showHome = false;
-      heroItem = null;
-    });
+    searchCtrl.clear();
+    _activateView('addon');
     if (addonSites.isEmpty) {
       final sites = await api.addonCatalogSites();
       if (mounted) setState(() => addonSites = sites);
@@ -2874,18 +2849,12 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleProviderNew() async {
     if (showProviderNew) {
-      setState(() => showProviderNew = false);
+      _activateView('home');
       return;
     }
-    setState(() {
-      searchCtrl.clear();
-      showProviderNew = true;
-      showFavorites = false;
-      showSourceEpisodes = false;
-      showHome = false;
-      heroItem = null;
-      providerNewLoading = true;
-    });
+    searchCtrl.clear();
+    _activateView('provider');
+    setState(() => providerNewLoading = true);
     if (providerNewGroups.isEmpty) {
       try {
         final groups = await api.providerRecent();
@@ -4533,9 +4502,7 @@ class _HomePageState extends State<HomePage> {
               active: showNewSeries, onTap: _toggleNewSeries),
           _aetherNavItem(Icons.favorite_border, 'Favoriten', active: showFavorites,
               onTap: () => setState(() {
-                    showFavorites = !showFavorites;
-                    showHome = false;
-                    heroItem = null;
+                    _activateView(showFavorites ? 'home' : 'favorites');
                   })),
           if (!Platform.isAndroid)
             _aetherNavItem(Icons.file_download_outlined, 'Import',
@@ -4797,11 +4764,9 @@ class _HomePageState extends State<HomePage> {
                         showFavorites ? Icons.favorite : Icons.favorite_border,
                         color: showFavorites ? accent(context) : Colors.white,
                       ),
-                      onPressed: () => setState(() {
-                        showFavorites = !showFavorites;
-                        showHome = false;
-                        heroItem = null;
-                      }),
+                      onPressed: () => _activateView(
+                        showFavorites ? 'home' : 'favorites',
+                      ),
                     ),
                   ],
                 ),
