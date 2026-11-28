@@ -708,6 +708,13 @@ class _HomePageState extends State<HomePage> {
     }
     final streamUrl = (resolved['stream_url'] ?? '').toString();
     final headers = Map<String, String>.from(resolved['headers'] ?? {});
+    if (streamUrl.isNotEmpty) {
+      final remembered = _findItemByTitle(title) ?? {
+        'title': title,
+        'url': url,
+      };
+      await prefs.rememberPlaying(remembered);
+    }
     if (streamUrl.isEmpty) {
       final msg = (resolved['message'] ?? 'Kein abspielbarer Stream gefunden').toString();
       await _showPlaybackError(msg, title);
@@ -4252,19 +4259,84 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Startseite: Hero-Banner + „Neuheiten"-Reihen im Stil der Referenz.
+  Map<String, dynamic>? _findItemByTitle(String title) {
+    final data = homeData;
+    if (data != null) {
+      final hero = data['hero'];
+      if (hero is Map && hero['title']?.toString() == title) {
+        return hero.cast<String, dynamic>();
+      }
+      for (final sec in ((data['sections'] as List?) ?? [])) {
+        for (final it in (((sec as Map)['items'] as List?) ?? [])) {
+          if (it is Map && it['title']?.toString() == title) {
+            return it.cast<String, dynamic>();
+          }
+        }
+      }
+    }
+    for (final it in results) {
+      if (it is Map && it['title']?.toString() == title) {
+        return it.cast<String, dynamic>();
+      }
+    }
+    final fav = prefs.favoriteItems[title];
+    if (fav != null) return fav;
+    final playing = prefs.playingItems[title];
+    if (playing != null) return playing;
+    if (heroItem is Map &&
+        (heroItem as Map)['title']?.toString() == title) {
+      return (heroItem as Map).cast<String, dynamic>();
+    }
+    for (final season in sourceEpisodeSeasons) {
+      for (final ep in (((season as Map)['episodes'] as List?) ?? [])) {
+        if (ep is Map && ep['title']?.toString() == title) {
+          return ep.cast<String, dynamic>();
+        }
+      }
+    }
+    return null;
+  }
+
   /// Alle Titel mit gespeicherter Position, die noch nicht zu Ende sind.
   List<Map<String, dynamic>> _resumeItems() {
     final out = <Map<String, dynamic>>[];
     final seen = <String>[];
+
+    bool usableTitle(String title) {
+      final l = title.toLowerCase();
+      if (l.startsWith('trailer:')) {
+        return false;
+      }
+      if ([
+        'einschalten', 'movie2k', 'streamcloud', 'download test',
+        'player-test', 'test film titel',
+      ].any(l.contains)) {
+        return false;
+      }
+      // Live-TV-Kanalnamen (GROSSBUCHSTABEN bzw. Sender-Kürzel) ausschliessen.
+      final letters = title.replaceAll(RegExp(r'[^A-Za-zÄÖÜäöüß]'), '');
+      if (letters.length > 3 && letters == letters.toUpperCase()) {
+        return false;
+      }
+      if (RegExp(
+        r'\b(HD|FHD|RAW|TV|KINO|FILM|SKY|MAX|WARNER|CINEDOME|POPCORN|'
+        r'AXN|TNT|ARTE|VH1|STINGRAY|UNIVERSAL|MUSIC)\b',
+        caseSensitive: false,
+      ).hasMatch(title)) {
+        return false;
+      }
+      return true;
+    }
 
     void add(dynamic raw) {
       if (raw is! Map) return;
       final map = raw.cast<String, dynamic>();
       final title = map['title']?.toString() ?? '';
       if (title.isEmpty || seen.contains(title)) return;
+      if (!usableTitle(title)) return;
       final pos = prefs.positionFor(title);
       final dur = prefs.durationFor(title);
-      if (pos <= 30 || dur <= pos + 10) return;
+      if (pos < 120 || dur < 600 || dur <= pos + 10) return;
       seen.add(title);
       final copy = Map<String, dynamic>.from(map);
       copy['_pos'] = pos;
@@ -4272,6 +4344,9 @@ class _HomePageState extends State<HomePage> {
       out.add(copy);
     }
 
+    for (final entry in prefs.playingItems.entries) {
+      add(entry.value);
+    }
     for (final entry in prefs.favoriteItems.entries) {
       add(entry.value);
     }
@@ -4292,6 +4367,14 @@ class _HomePageState extends State<HomePage> {
       for (final ep in (((season as Map)['episodes'] as List?) ?? [])) {
         add(ep);
       }
+    }
+    // Alles uebrige aus den Positionen (z. B. alter Serien-Folgen ohne
+    // gespeicherte Item-Daten) ueber die Titelsuche wiederauffindbar machen.
+    for (final entry in prefs.positions.entries) {
+      add({
+        'title': entry.key,
+        'url': 'plugin://flixam/search/${Uri.encodeComponent(entry.key)}',
+      });
     }
     out.sort((a, b) =>
         (b['_pos'] as int).compareTo(a['_pos'] as int));

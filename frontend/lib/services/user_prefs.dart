@@ -6,6 +6,7 @@ class UserPrefs {
   final Set<String> seen = {};
   final Set<String> favorites = {};
   final Map<String, Map<String, dynamic>> favoriteItems = {};
+  final Map<String, Map<String, dynamic>> playingItems = {};
   final Map<String, int> positions = {};
   final Map<String, int> durations = {};
   final Map<String, int> myRatings = {};
@@ -32,6 +33,12 @@ class UserPrefs {
         items.forEach((key, value) {
           if (value is Map) {
             favoriteItems[key] = value.cast<String, dynamic>();
+          }
+        });
+        final playing = map['playingItems'] as Map<String, dynamic>? ?? {};
+        playing.forEach((key, value) {
+          if (value is Map) {
+            playingItems[key] = value.cast<String, dynamic>();
           }
         });
         final pos = map['positions'] as Map<String, dynamic>? ?? {};
@@ -76,6 +83,13 @@ class UserPrefs {
   int durationFor(String title) => durations[title] ?? 0;
 
   int ratingFor(String title) => myRatings[title] ?? 0;
+
+  Future<void> rememberPlaying(Map<String, dynamic> item) async {
+    final title = item['title']?.toString() ?? '';
+    if (title.isEmpty) return;
+    playingItems[title] = Map<String, dynamic>.from(item);
+    await _save();
+  }
 
   bool isFavoriteChannel(String title) => favoriteChannels.contains(title);
 
@@ -153,6 +167,7 @@ class UserPrefs {
         'seen': seen.toList(),
         'favorites': favorites.toList(),
         'favoriteItems': favoriteItems,
+        'playingItems': playingItems,
         'positions': positions,
         'durations': durations,
         'myRatings': myRatings,
