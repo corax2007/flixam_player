@@ -219,13 +219,15 @@ class _HomePageState extends State<HomePage> {
     player.stream.position.listen((p) {
       if (!mounted) return;
       setState(() => playerPosition = p);
-      // 2 Minuten vor Ende fragen - der Abspann wird übersprungen.
+      // Konfigurierbare Zeit vor Ende - der Abspann wird übersprungen.
       final rest = playerDuration - p;
+      final lead = appSettings.autoPlayLeadSeconds;
       if (_episodeQueue.isNotEmpty &&
           _episodeIndex < _episodeQueue.length &&
           !_nextPromptShown &&
-          playerDuration.inSeconds > 150 &&
-          rest <= const Duration(seconds: 120) &&
+          lead > 0 &&
+          playerDuration.inSeconds > lead + 30 &&
+          rest <= Duration(seconds: lead) &&
           rest > Duration.zero) {
         _nextPromptShown = true;
         _startNextCountdown();
@@ -1510,35 +1512,48 @@ class _HomePageState extends State<HomePage> {
                     },
                     hint: 'Folgen automatisch nacheinander',
                   ),
-                  if (appSettings.autoPlaySeason)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              'Nächste Folge startet nach',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          DropdownButton<int>(
-                            value: appSettings.autoPlayDelay,
-                            items: const [
-                              DropdownMenuItem(value: 0, child: Text('sofort')),
-                              DropdownMenuItem(value: 5, child: Text('5 s')),
-                              DropdownMenuItem(value: 10, child: Text('10 s')),
-                              DropdownMenuItem(value: 15, child: Text('15 s')),
-                            ],
-                            onChanged: (v) async {
-                              if (v == null) return;
-                              setState(() => appSettings.autoPlayDelay = v);
-                              await appSettings.save();
-                              settingsRevision.value++;
-                            },
-                          ),
-                        ],
-                      ),
+                  if (appSettings.autoPlaySeason) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Ankündigung vor Ende: ${appSettings.autoPlayLeadSeconds} s',
+                      style: const TextStyle(fontSize: 12),
                     ),
+                    Slider(
+                      value: appSettings.autoPlayLeadSeconds.toDouble(),
+                      min: 0,
+                      max: 300,
+                      divisions: 30,
+                      label: '${appSettings.autoPlayLeadSeconds} s',
+                      onChanged: (v) async {
+                        setState(() =>
+                            appSettings.autoPlayLeadSeconds = v.round());
+                        await appSettings.save();
+                      },
+                      onChangeEnd: (_) => settingsRevision.value++,
+                    ),
+                    Text(
+                      'Countdown: ${appSettings.autoPlayDelay == 0 ? 'sofort' : '${appSettings.autoPlayDelay} s'}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Slider(
+                      value: appSettings.autoPlayDelay.toDouble(),
+                      min: 0,
+                      max: 30,
+                      divisions: 30,
+                      label: appSettings.autoPlayDelay == 0
+                          ? 'sofort'
+                          : '${appSettings.autoPlayDelay} s',
+                      onChanged: (v) async {
+                        setState(() => appSettings.autoPlayDelay = v.round());
+                        await appSettings.save();
+                      },
+                      onChangeEnd: (_) => settingsRevision.value++,
+                    ),
+                    const Text(
+                      '0 s Countdown = sofortiger Wechsel (Abspann wird übersprungen)',
+                      style: TextStyle(fontSize: 10, color: Colors.white54),
+                    ),
+                  ],
                   _settingsSwitch(
                     'Hero-Details beim Browse',
                     appSettings.heroInBrowse,
