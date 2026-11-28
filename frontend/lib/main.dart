@@ -82,6 +82,16 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const MethodChannel _windowTitleChannel =
+      MethodChannel('de.flixam/window_title');
+
+  void _setWindowTitle(String title) {
+    if (Platform.isAndroid) return;
+    _windowTitleChannel
+        .invokeMethod('setTitle', {'title': title})
+        .catchError((_) {});
+  }
+
   final ApiService api = ApiService();
   late final AppSettings appSettings = widget.settings ?? AppSettings.load();
   final UserPrefs prefs = UserPrefs();
@@ -287,6 +297,7 @@ class _HomePageState extends State<HomePage> {
       showDownloads = view == 'downloads';
       if (view != 'home') heroItem = null;
     });
+    if (view == 'home') _setWindowTitle('flixam_player');
   }
 
   Future<void> _loadAvailability() async {
@@ -733,6 +744,7 @@ class _HomePageState extends State<HomePage> {
         ..clear()
         ..add(title);
       currentPlayingTitle = title;
+      _setWindowTitle(title);
       _lastSavedSecond = 0;
       final saved = resume ? prefs.positionFor(title) : 0;
       if (saved > 30) {
@@ -5208,6 +5220,7 @@ class _HomePageState extends State<HomePage> {
                                   icon: const Icon(Icons.arrow_back, size: 28),
                                   onPressed: () {
                                     player.stop();
+                                    _setWindowTitle('flixam_player');
                                     setState(() => showPlayer = false);
                                   },
                                 ),
@@ -5216,6 +5229,7 @@ class _HomePageState extends State<HomePage> {
                                   icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 26),
                                   onPressed: () {
                                     player.stop();
+                                    _setWindowTitle('flixam_player');
                                     setState(() => showPlayer = false);
                                   },
                                 ),

@@ -1,6 +1,12 @@
 #include "my_application.h"
 
 #include <flutter_linux/flutter_linux.h>
+#include <flutter_linux/fl_engine.h>
+#include <flutter_linux/fl_method_channel.h>
+#include <flutter_linux/fl_binary_messenger.h>
+#include <flutter_linux/fl_view.h>
+#include <flutter_linux/fl_method_codec.h>
+#include <flutter_linux/fl_standard_method_codec.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
@@ -14,6 +20,31 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+static GtkWindow* g_window = nullptr;
+static GtkHeaderBar* g_header_bar = nullptr;
+
+// Dart setzt den Fenstertitel auf den gerade laufenden Film/die Serie.
+static void title_method_call_cb(FlMethodChannel* channel,
+                                  FlMethodCall* method_call,
+                                  gpointer user_data) {
+  if (g_strcmp0(fl_method_call_get_name(method_call), "setTitle") == 0) {
+    FlValue* args = fl_method_call_get_args(method_call);
+    const gchar* title = nullptr;
+    if (args != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_MAP) {
+      FlValue* value = fl_value_lookup_string(args, "title");
+      if (value != nullptr) title = fl_value_get_string(value);
+    }
+    if (title != nullptr) {
+      if (g_header_bar != nullptr)
+        gtk_header_bar_set_title(g_header_bar, title);
+      if (g_window != nullptr) gtk_window_set_title(g_window, title);
+    }
+    fl_method_call_respond_success(method_call, fl_value_new_null(), nullptr);
+  } else {
+    fl_method_call_respond_not_implemented(method_call, nullptr);
+  }
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -24,6 +55,7 @@ static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  g_window = window;
 
   // Use a header bar when running in GNOME as this is the common style used
   // by applications and is the setup most users will be using (e.g. Ubuntu
@@ -44,6 +76,7 @@ static void my_application_activate(GApplication* application) {
 #endif
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
+    g_header_bar = header_bar;
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_header_bar_set_title(header_bar, "frontend");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
@@ -59,6 +92,15 @@ static void my_application_activate(GApplication* application) {
       project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  FlEngine* engine = fl_view_get_engine(view);
+  FlBinaryMessenger* messenger = fl_engine_get_binary_messenger(engine);
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) title_channel = fl_method_channel_new(
+      messenger, "de.flixam/window_title", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      title_channel, title_method_call_cb, nullptr, nullptr);
+  g_object_set_data_full(G_OBJECT(application), "title_channel",
+                         g_object_ref(title_channel), g_object_unref);
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
