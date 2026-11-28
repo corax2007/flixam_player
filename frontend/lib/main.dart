@@ -4252,6 +4252,136 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Startseite: Hero-Banner + „Neuheiten"-Reihen im Stil der Referenz.
+  /// Alle Titel mit gespeicherter Position, die noch nicht zu Ende sind.
+  List<Map<String, dynamic>> _resumeItems() {
+    final out = <Map<String, dynamic>>[];
+    final seen = <String>[];
+
+    void add(dynamic raw) {
+      if (raw is! Map) return;
+      final map = raw.cast<String, dynamic>();
+      final title = map['title']?.toString() ?? '';
+      if (title.isEmpty || seen.contains(title)) return;
+      final pos = prefs.positionFor(title);
+      final dur = prefs.durationFor(title);
+      if (pos <= 30 || dur <= pos + 10) return;
+      seen.add(title);
+      final copy = Map<String, dynamic>.from(map);
+      copy['_pos'] = pos;
+      copy['_dur'] = dur;
+      out.add(copy);
+    }
+
+    for (final entry in prefs.favoriteItems.entries) {
+      add(entry.value);
+    }
+    final data = homeData;
+    if (data != null) {
+      add((data['hero'] as Map?)?.cast<String, dynamic>());
+      for (final sec in ((data['sections'] as List?) ?? [])) {
+        for (final it in (((sec as Map)['items'] as List?) ?? [])) {
+          add(it);
+        }
+      }
+    }
+    for (final it in results) {
+      add(it);
+    }
+    if (heroItem is Map) add(heroItem);
+    for (final season in sourceEpisodeSeasons) {
+      for (final ep in (((season as Map)['episodes'] as List?) ?? [])) {
+        add(ep);
+      }
+    }
+    out.sort((a, b) =>
+        (b['_pos'] as int).compareTo(a['_pos'] as int));
+    return out;
+  }
+
+  Widget _resumeCard(Map<String, dynamic> it) {
+    final title = it['title']?.toString() ?? '';
+    final poster = it['poster_url']?.toString() ?? '';
+    final pos = it['_pos'] as int;
+    final dur = it['_dur'] as int;
+    return TvFocusable(
+      onTap: () => _play(it['url']?.toString() ?? '', title, resume: true),
+      builder: (focused) => SizedBox(
+        width: 120,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 160,
+                width: 120,
+                child: poster.isNotEmpty
+                    ? Image.network(
+                        poster,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            Container(color: Colors.grey.shade900),
+                      )
+                    : Container(color: Colors.grey.shade900),
+              ),
+            ),
+            const SizedBox(height: 4),
+            LinearProgressIndicator(
+              value: (pos / dur).clamp(0.0, 1.0),
+              minHeight: 3,
+              color: accent(context),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Fortsetzen ${_fmtClock(Duration(seconds: pos))} · '
+              'noch ${_fmtClock(Duration(seconds: dur - pos))}',
+              maxLines: 2,
+              style: const TextStyle(
+                fontSize: 9,
+                color: Colors.lightGreenAccent,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildResumeSlivers() {
+    final items = _resumeItems();
+    if (items.isEmpty) return [];
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: Text(
+            'Fortsetzen (${items.length})',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+      SliverToBoxAdapter(
+        child: SizedBox(
+          height: 220,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (ctx, i) => _resumeCard(items[i]),
+          ),
+        ),
+      ),
+    ];
+  }
+
   List<Widget> _buildHomeSlivers() {
     if (selectedProviderId != null) {
       final visible = providerMovies.where((i) {
@@ -4384,6 +4514,8 @@ class _HomePageState extends State<HomePage> {
         myNote: prefs.noteFor(hero['title']?.toString() ?? ''),
       ));
     }
+
+    list.addAll(_buildResumeSlivers());
 
     for (final section in (data['sections'] as List?) ?? []) {
       final title = section['title']?.toString() ?? '';
