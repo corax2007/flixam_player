@@ -881,6 +881,28 @@ def addon_catalog(site: str = Query(""), type: str = Query("movie"),
             "media_type": type,
             "source": site,
         })
+    # Einige Quellen (z. B. filmpalast.to) sind vom Host nicht erreichbar oder
+    # blocken Hotlinks -> TMDB-Poster als Fallback.
+    from concurrent.futures import ThreadPoolExecutor
+
+    def tmdb_poster(item):
+        try:
+            data = _tmdb_get("search/multi", {"query": item["title"]}) or {}
+            for r in (data.get("results") or []):
+                path = r.get("poster_path") or r.get("backdrop_path")
+                if path:
+                    size = "w500" if r.get("poster_path") else "w780"
+                    return "https://image.tmdb.org/t/p/" + size + path
+        except Exception:
+            pass
+        return ""
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        posters = list(pool.map(tmdb_poster, out))
+    for item, poster in zip(out, posters):
+        if poster:
+            item["poster_url"] = poster
+
     _TMDB_CACHE[cache_key] = out
     return {"items": out, "count": len(out)}
 

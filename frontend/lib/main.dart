@@ -2958,7 +2958,8 @@ class _HomePageState extends State<HomePage> {
       items = items.map((m) {
         final copy = Map<String, dynamic>.from(m as Map);
         final poster = copy['poster_url']?.toString() ?? '';
-        if (poster.startsWith('http')) {
+        if (poster.startsWith('http') &&
+            !poster.contains('image.tmdb.org')) {
           copy['poster_url'] =
               '${api.baseUrl}/art/proxy?url=${Uri.encodeComponent(poster)}';
         }
