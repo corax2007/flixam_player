@@ -4626,6 +4626,72 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _renamePlaylist() async {
+    final ctrl = TextEditingController(text: prefs.playlistName);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Playlist umbenennen'),
+        content: TextField(controller: ctrl, autofocus: true),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && ctrl.text.trim().isNotEmpty && mounted) {
+      setState(() => prefs.playlistName = ctrl.text.trim());
+      await prefs.save();
+    }
+  }
+
+  Future<void> _addToPlaylistDialog() async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Titel hinzufügen'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Filmtitel'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hinzufügen'),
+          ),
+        ],
+      ),
+    );
+    final title = ctrl.text.trim();
+    if (ok != true || title.isEmpty) return;
+    final info = await api.resolveTitle(title);
+    final item = <String, dynamic>{
+      'title': title,
+      'url': info['url']?.toString().isNotEmpty ?? false
+          ? info['url'].toString()
+          : 'plugin://flixam/search/${Uri.encodeComponent(title)}',
+      'poster_url': info['poster_url']?.toString() ?? '',
+      'backdrop_url': info['backdrop_url']?.toString() ?? '',
+      'media_type': info['media_type']?.toString() ?? '',
+      'year': info['year']?.toString() ?? '',
+      'rating': info['rating'],
+    };
+    await prefs.addToPlaylist(item);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _togglePlaylist() async {
     if (showPlaylist) {
       _activateView('home');
@@ -4643,11 +4709,27 @@ class _HomePageState extends State<HomePage> {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  'Meine Playlist (${items.length})',
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700),
+                child: InkWell(
+                  onTap: _renamePlaylist,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${prefs.playlistName} (${items.length})',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const Icon(Icons.edit, size: 15, color: Colors.white54),
+                      const SizedBox(width: 6),
+                    ],
+                  ),
                 ),
+              ),
+              IconButton(
+                tooltip: 'Titel hinzufügen',
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: _addToPlaylistDialog,
               ),
               IconButton(
                 tooltip: 'Schließen',
@@ -4699,7 +4781,7 @@ class _HomePageState extends State<HomePage> {
         child: Padding(
           padding: EdgeInsets.all(20),
           child: Text(
-            'Ziehe einen Titel hierher, um ihn aus der Playlist zu entfernen:',
+            'Zum Entfernen hierher ziehen:',
             style: TextStyle(fontSize: 11, color: Colors.white54),
           ),
         ),

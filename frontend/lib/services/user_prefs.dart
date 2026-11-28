@@ -8,6 +8,7 @@ class UserPrefs {
   final Map<String, Map<String, dynamic>> favoriteItems = {};
   final Map<String, Map<String, dynamic>> playingItems = {};
   final List<Map<String, dynamic>> playlist = [];
+  String playlistName = 'Meine Playlist';
   final Map<String, int> positions = {};
   final Map<String, int> durations = {};
   final Map<String, int> myRatings = {};
@@ -45,6 +46,8 @@ class UserPrefs {
         for (final v in (map['playlist'] as List?) ?? []) {
           if (v is Map) playlist.add(v.cast<String, dynamic>());
         }
+        final name = map['playlistName']?.toString();
+        if (name != null && name.isNotEmpty) playlistName = name;
         final pos = map['positions'] as Map<String, dynamic>? ?? {};
         pos.forEach((key, value) {
           positions[key] = int.tryParse(value.toString()) ?? 0;
@@ -195,6 +198,8 @@ class UserPrefs {
     await _save();
   }
 
+  Future<void> save() => _save();
+
   Future<void> _save() async {
     try {
       await File(_path).writeAsString(jsonEncode({
@@ -203,6 +208,7 @@ class UserPrefs {
         'favoriteItems': favoriteItems,
         'playingItems': playingItems,
         'playlist': playlist,
+        'playlistName': playlistName,
         'positions': positions,
         'durations': durations,
         'myRatings': myRatings,
