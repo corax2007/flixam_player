@@ -723,6 +723,21 @@ class _HomePageState extends State<HomePage> {
     if (streamUrl.isEmpty) {
       final msg = (resolved['message'] ?? 'Kein abspielbarer Stream gefunden').toString();
       await _showPlaybackError(msg, title);
+      if (mounted && prefs.positionFor(title) > 30) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"$title" ist nicht mehr verfügbar.'),
+            action: SnackBarAction(
+              label: 'Aus Fortsetzen entfernen',
+              onPressed: () async {
+                await prefs.clearProgress(title);
+                _resumeMeta.remove(title);
+                if (mounted) setState(() {});
+              },
+            ),
+          ),
+        );
+      }
       return;
     }
     await _openStream(streamUrl, headers, title, resume: resume);
