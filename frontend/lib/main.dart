@@ -4351,7 +4351,7 @@ class _HomePageState extends State<HomePage> {
       if (meta != null) {
         for (final key in [
           'poster_url', 'backdrop_url', 'media_type', 'year', 'rating',
-          'overview',
+          'overview', 'url',
         ]) {
           if ((map[key]?.toString() ?? '').isEmpty &&
               (meta[key]?.toString() ?? '').isNotEmpty) {
@@ -4436,7 +4436,14 @@ class _HomePageState extends State<HomePage> {
     final pos = it['_pos'] as int;
     final dur = it['_dur'] as int;
     return TvFocusable(
-      onTap: () => _play(it['url']?.toString() ?? '', title, resume: true),
+      onTap: () {
+        setState(() {
+          selectedItem = it;
+          heroItem = it;
+        });
+        _loadHeroSources(title);
+        _loadHeroTrailer(it);
+      },
       builder: (focused) => SizedBox(
         width: 120,
         child: Column(
