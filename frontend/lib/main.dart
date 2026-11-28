@@ -116,6 +116,8 @@ class _HomePageState extends State<HomePage> {
   bool showProviderNew = false;
   bool providerNewLoading = false;
   bool showDownloads = false;
+  bool showResume = false;
+  final Map<String, dynamic> _resumeMeta = {};
   List<dynamic> downloadItems = [];
   Timer? _downloadTimer;
   bool zapping = false;
@@ -295,6 +297,7 @@ class _HomePageState extends State<HomePage> {
       showAddonCatalog = view == 'addon';
       showLiveTv = view == 'live';
       showDownloads = view == 'downloads';
+      showResume = view == 'resume';
       if (view != 'home') heroItem = null;
     });
     if (view == 'home') _setWindowTitle('flixam_player');
@@ -354,6 +357,7 @@ class _HomePageState extends State<HomePage> {
     await _loadGenres();
     await _loadStreamingProviders();
     await _loadHome();
+    _loadResumeMeta();
   }
 
   Future<void> _loadHome({bool force = false}) async {
@@ -375,7 +379,8 @@ class _HomePageState extends State<HomePage> {
             !showNewSeries &&
             !showAddonCatalog &&
             !showLiveTv &&
-            !showDownloads) {
+            !showDownloads &&
+            !showResume) {
           showHome = true;
         }
         loading = false;
@@ -4330,8 +4335,20 @@ class _HomePageState extends State<HomePage> {
 
     void add(dynamic raw) {
       if (raw is! Map) return;
-      final map = raw.cast<String, dynamic>();
+      final map = Map<String, dynamic>.from(raw.cast<String, dynamic>());
       final title = map['title']?.toString() ?? '';
+      final meta = _resumeMeta[title];
+      if (meta != null) {
+        for (final key in [
+          'poster_url', 'backdrop_url', 'media_type', 'year', 'rating',
+          'overview',
+        ]) {
+          if ((map[key]?.toString() ?? '').isEmpty &&
+              (meta[key]?.toString() ?? '').isNotEmpty) {
+            map[key] = meta[key];
+          }
+        }
+      }
       if (title.isEmpty || seen.contains(title)) return;
       if (!usableTitle(title)) return;
       final pos = prefs.positionFor(title);
@@ -4435,6 +4452,87 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _loadResumeMeta() async {
+    final titles = prefs.positions.keys.where((t) {
+      final pos = prefs.positionFor(t);
+      final dur = prefs.durationFor(t);
+      return pos >= 120 &&
+          dur >= 600 &&
+          dur > pos + 10 &&
+          !_resumeMeta.containsKey(t) &&
+          !prefs.playingItems.containsKey(t);
+    }).take(40).toList();
+    if (titles.isEmpty) return;
+    final results = await Future.wait(
+      titles.map((t) => api.resolveTitle(t)),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (var i = 0; i < titles.length; i++) {
+        if (results[i].isNotEmpty) _resumeMeta[titles[i]] = results[i];
+      }
+    });
+  }
+
+  Future<void> _toggleResume() async {
+    if (showResume) {
+      _activateView('home');
+      return;
+    }
+    _activateView('resume');
+    await _loadResumeMeta();
+  }
+
+  List<Widget> _buildResumePageSlivers() {
+    final items = _resumeItems();
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Fortsetzen (${items.length})',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => _activateView('home'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (items.isEmpty)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Keine angefangenen Titel.'),
+          ),
+        )
+      else
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 140,
+              childAspectRatio: 2 / 3.2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 14,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (ctx, i) => _resumeCard(items[i]),
+              childCount: items.length,
+            ),
+          ),
+        ),
+    ];
   }
 
   List<Widget> _buildResumeSlivers() {
@@ -4600,7 +4698,7 @@ class _HomePageState extends State<HomePage> {
 
     list.addAll(_buildResumeSlivers());
 
-    for (final section in (data['sections'] as List?) ?? []) {
+    for (final section in ((data['sections'] as List?) ?? []).take(9)) {
       final title = section['title']?.toString() ?? '';
       final items = _availabilityFiltered(
           _langFiltered((section['items'] as List?) ?? []));
@@ -4743,7 +4841,8 @@ class _HomePageState extends State<HomePage> {
       !showNewSeries &&
       !showAddonCatalog &&
       !showLiveTv &&
-      !showDownloads;
+      !showDownloads &&
+      !showResume;
 
   Widget _aetherNavItem(
     IconData icon,
@@ -4906,6 +5005,8 @@ class _HomePageState extends State<HomePage> {
               active: showProviderNew, onTap: _toggleProviderNew),
           _aetherNavItem(Icons.tv_outlined, 'Neue Serien',
               active: showNewSeries, onTap: _toggleNewSeries),
+          _aetherNavItem(Icons.play_circle_outline, 'Fortsetzen',
+              active: showResume, onTap: _toggleResume),
           _aetherNavItem(Icons.favorite_border, 'Favoriten', active: showFavorites,
               onTap: () => setState(() {
                     _activateView(showFavorites ? 'home' : 'favorites');
@@ -5202,6 +5303,7 @@ class _HomePageState extends State<HomePage> {
                   myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
                   myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
                 ),
+              if (showResume) ..._buildResumePageSlivers(),
               if (showDownloads) ..._buildDownloadsSlivers(),
               if (showLiveTv) ..._buildLiveTvSlivers(),
               if (showAddonCatalog) ..._buildAddonCatalogSlivers(),

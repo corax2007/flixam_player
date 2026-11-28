@@ -636,6 +636,32 @@ def _epg_load() -> dict:
     return channels
 
 
+@app.get("/tmdb/resolve-title")
+def tmdb_resolve_title(title: str = Query("")):
+    """Titel ueber die TMDB-Suche wiederauffindbar machen (Cover/URL)."""
+    if not title.strip():
+        return {}
+    cache_key = f"resolve-title|{title}"
+    if cache_key in _TMDB_CACHE:
+        return _TMDB_CACHE[cache_key]
+    out = {}
+    try:
+        data = _tmdb_get("search/multi", {"query": title.strip()}) or {}
+        for r in (data.get("results") or []):
+            if r.get("media_type") not in ("movie", "tv"):
+                continue
+            item = _tmdb_to_item(
+                r, "movie" if r.get("media_type") == "movie" else "tv"
+            )
+            if item:
+                out = item
+                break
+    except Exception:
+        pass
+    _TMDB_CACHE[cache_key] = out
+    return out
+
+
 @app.get("/vavoo/program/info")
 def vavoo_program_info(title: str = Query("")):
     """TMDB-Metadaten zu einer laufenden Sendung (nur Anzeige, keine EPG)."""

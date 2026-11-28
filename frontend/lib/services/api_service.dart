@@ -89,6 +89,18 @@ class ApiService {
   String downloadUrl(String key) =>
       '$baseUrl/download/file/${Uri.encodeComponent(key)}';
 
+  Future<Map<String, dynamic>> resolveTitle(String title) async {
+    if (useDirect) return TmdbService.instance.resolveTitle(title);
+    try {
+      final r = await http.get(
+        Uri.parse('$baseUrl/tmdb/resolve-title?title=${Uri.encodeComponent(title)}'),
+      ).timeout(const Duration(seconds: 40));
+      return jsonDecode(r.body) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
   Future<Map<String, dynamic>> vavooProgramInfo(String title) async {
     if (useDirect) return {};
     try {

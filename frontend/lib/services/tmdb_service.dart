@@ -239,6 +239,27 @@ class TmdbService {
   }
 
   /// Alle Filme und Serien eines Streaminganbieters.
+  Future<Map<String, dynamic>> resolveTitle(String title) async {
+    final key = 'resolve-title|$title';
+    final cached = _cache[key] as Map<String, dynamic>?;
+    if (cached != null) return cached;
+    Map<String, dynamic> out = {};
+    try {
+      final data = await _get('search/multi', {'query': title}) ?? {};
+      for (final r in (data['results'] as List?) ?? []) {
+        final mt = r['media_type']?.toString() ?? '';
+        if (mt != 'movie' && mt != 'tv') continue;
+        final it = await toItem(r, mt);
+        if (it != null) {
+          out = it;
+          break;
+        }
+      }
+    } catch (_) {}
+    _cache[key] = out;
+    return out;
+  }
+
   Future<List<Map<String, dynamic>>> providerItems(int id) async {
     final key = 'provider|$id';
     final cached = _cache[key] as List<Map<String, dynamic>>?;
