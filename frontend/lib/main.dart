@@ -109,6 +109,8 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> downloadItems = [];
   Timer? _downloadTimer;
   bool zapping = false;
+  bool previewActive = false;
+  int _zapToken = 0;
   int zapSeconds = 5;
   Timer? _zapTimer;
   bool showLiveTv = false;
@@ -2228,6 +2230,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _stopZap() {
+    _zapToken++;
     _zapTimer?.cancel();
     _zapTimer = null;
     if (zapping) setState(() => zapping = false);
@@ -2236,10 +2239,33 @@ class _HomePageState extends State<HomePage> {
   void _zapStep(int delta) {
     final vms = _liveChannelVms();
     if (vms.isEmpty) return;
-    _selectLiveChannel(
-      (selectedLiveIndex + delta).clamp(0, vms.length - 1),
-      vms,
-    );
+    final next = (selectedLiveIndex + delta).clamp(0, vms.length - 1);
+    _selectLiveChannel(next, vms);
+    if (zapping) _zapOpenStream(vms[next]);
+  }
+
+  Future<void> _zapOpenStream(LiveChannelVm vm) async {
+    final token = ++_zapToken;
+    if (vm.url.isEmpty) return;
+    try {
+      final r = await api.resolve(vm.url);
+      if (token != _zapToken || !mounted) return;
+      final s = r['stream_url']?.toString() ?? '';
+      if (s.isEmpty) {
+        if (mounted) setState(() => previewActive = false);
+        return;
+      }
+      await player.open(Media(
+        s,
+        httpHeaders: Map<String, String>.from(r['headers'] ?? {}),
+      ));
+      if (token != _zapToken || !mounted) return;
+      await player.play();
+      if (mounted) setState(() => previewActive = true);
+    } catch (_) {
+      if (token != _zapToken || !mounted) return;
+      if (mounted) setState(() => previewActive = false);
+    }
   }
 
   void _startZap() {
@@ -2248,6 +2274,8 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() => zapping = true);
+    final vms = _liveChannelVms();
+    if (vms.isNotEmpty) _zapOpenStream(vms[selectedLiveIndex]);
     _zapTimer = Timer.periodic(Duration(seconds: zapSeconds), (_) {
       if (!mounted || !showLiveTv || showPlayer) return;
       _zapStep(1);
@@ -2413,6 +2441,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _toggleLiveTv() async {
     if (showLiveTv) {
       _stopZap();
+      _zapToken++;
+      player.stop();
+      if (mounted) setState(() => previewActive = false);
       _activateView('home');
       return;
     }
@@ -2768,6 +2799,17 @@ class _HomePageState extends State<HomePage> {
                       child: EpgInspectorPanel(
                         vm: inspector,
                         onPlay: () => _play(currentVm.url, currentVm.name),
+                        videoPreview: previewActive && !showPlayer
+                            ? ClipRRect(
+                                borderRadius: const BorderRadius.all(
+                                  AetherColors.cardRadius,
+                                ),
+                                child: Video(
+                                  controller: videoController,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : null,
                       ),
                     ),
                   ),

@@ -267,8 +267,14 @@ class AiHighlightCard extends StatelessWidget {
 class EpgInspectorPanel extends StatelessWidget {
   final InspectorVm vm;
   final VoidCallback onPlay;
+  final Widget? videoPreview;
 
-  const EpgInspectorPanel({super.key, required this.vm, required this.onPlay});
+  const EpgInspectorPanel({
+    super.key,
+    required this.vm,
+    required this.onPlay,
+    this.videoPreview,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -299,15 +305,17 @@ class EpgInspectorPanel extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  vm.backdrop.isNotEmpty
-                      ? Image.network(
-                          vm.backdrop,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
-                            color: AetherColors.active,
-                          ),
-                        )
-                      : Container(color: AetherColors.active),
+                  if (videoPreview != null) videoPreview!,
+                  if (videoPreview == null && vm.backdrop.isNotEmpty)
+                    Image.network(
+                      vm.backdrop,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        color: AetherColors.active,
+                      ),
+                    ),
+                  if (videoPreview == null && vm.backdrop.isEmpty)
+                    Container(color: AetherColors.active),
                   const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
