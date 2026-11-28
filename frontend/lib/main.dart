@@ -194,6 +194,7 @@ class _HomePageState extends State<HomePage> {
   final List<Map<String, dynamic>> _episodeQueue = [];
   int _episodeIndex = 0;
   bool showNextCountdown = false;
+  bool _nextPromptShown = false;
   int nextCountdown = 0;
   Timer? _nextTimer;
   List<Map<String, String>> heroSources = [];
@@ -218,6 +219,17 @@ class _HomePageState extends State<HomePage> {
     player.stream.position.listen((p) {
       if (!mounted) return;
       setState(() => playerPosition = p);
+      // 2 Minuten vor Ende fragen - der Abspann wird übersprungen.
+      final rest = playerDuration - p;
+      if (_episodeQueue.isNotEmpty &&
+          _episodeIndex < _episodeQueue.length &&
+          !_nextPromptShown &&
+          playerDuration.inSeconds > 150 &&
+          rest <= const Duration(seconds: 120) &&
+          rest > Duration.zero) {
+        _nextPromptShown = true;
+        _startNextCountdown();
+      }
       if (currentPlayingTitle != null && p.inSeconds - _lastSavedSecond >= 10) {
         _lastSavedSecond = p.inSeconds;
         prefs.savePosition(currentPlayingTitle!, p.inSeconds);
@@ -239,26 +251,10 @@ class _HomePageState extends State<HomePage> {
       if (currentPlayingTitle != null) {
         prefs.savePosition(currentPlayingTitle!, 0);
       }
-      if (_episodeQueue.isNotEmpty && _episodeIndex < _episodeQueue.length) {
-        if (appSettings.autoPlayDelay <= 0) {
-          _playNextEpisode();
-        } else {
-          setState(() {
-            nextCountdown = appSettings.autoPlayDelay;
-            showNextCountdown = true;
-          });
-          _nextTimer?.cancel();
-          _nextTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-            if (!mounted) return;
-            if (nextCountdown <= 1) {
-              _nextTimer?.cancel();
-              showNextCountdown = false;
-              _playNextEpisode();
-            } else {
-              setState(() => nextCountdown--);
-            }
-          });
-        }
+      if (!_nextPromptShown &&
+          _episodeQueue.isNotEmpty &&
+          _episodeIndex < _episodeQueue.length) {
+        _startNextCountdown();
       }
     });
     // Bei mehreren Folgen in der Wiedergabeliste Titel/Position pro Folge
@@ -734,6 +730,7 @@ class _HomePageState extends State<HomePage> {
     String title, {
     bool resume = false,
   }) async {
+    _nextPromptShown = false;
     if (vpnEnabled) {
       try {
         (player.platform as dynamic)?.setProperty?.call('http-proxy', 'http://127.0.0.1:8080');
@@ -798,6 +795,29 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _startNextCountdown() {
+    if (appSettings.autoPlayDelay <= 0) {
+      _playNextEpisode();
+      return;
+    }
+    if (showNextCountdown) return;
+    setState(() {
+      nextCountdown = appSettings.autoPlayDelay;
+      showNextCountdown = true;
+    });
+    _nextTimer?.cancel();
+    _nextTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (nextCountdown <= 1) {
+        _nextTimer?.cancel();
+        showNextCountdown = false;
+        _playNextEpisode();
+      } else {
+        setState(() => nextCountdown--);
+      }
+    });
+  }
+
   Future<void> _playNextEpisode() async {
     if (_episodeIndex >= _episodeQueue.length) return;
     final item = _episodeQueue[_episodeIndex];
@@ -811,6 +831,7 @@ class _HomePageState extends State<HomePage> {
 
   void _cancelNextEpisode() {
     _nextTimer?.cancel();
+    _nextPromptShown = true;
     _episodeQueue.clear();
     if (mounted) setState(() => showNextCountdown = false);
   }
