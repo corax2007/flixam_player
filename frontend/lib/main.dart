@@ -1515,15 +1515,18 @@ class _HomePageState extends State<HomePage> {
                   if (appSettings.autoPlaySeason) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Ankündigung vor Ende: ${appSettings.autoPlayLeadSeconds} s',
+                      'Ankündigung vor Ende: '
+                      '${appSettings.autoPlayLeadSeconds >= 60 ? '${appSettings.autoPlayLeadSeconds ~/ 60} min ${appSettings.autoPlayLeadSeconds % 60} s' : '${appSettings.autoPlayLeadSeconds} s'}',
                       style: const TextStyle(fontSize: 12),
                     ),
                     Slider(
                       value: appSettings.autoPlayLeadSeconds.toDouble(),
                       min: 0,
-                      max: 300,
-                      divisions: 30,
-                      label: '${appSettings.autoPlayLeadSeconds} s',
+                      max: 600,
+                      divisions: 60,
+                      label: appSettings.autoPlayLeadSeconds >= 60
+                          ? '${appSettings.autoPlayLeadSeconds ~/ 60} min'
+                          : '${appSettings.autoPlayLeadSeconds} s',
                       onChanged: (v) async {
                         setState(() =>
                             appSettings.autoPlayLeadSeconds = v.round());
