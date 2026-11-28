@@ -644,9 +644,13 @@ def tmdb_resolve_title(title: str = Query("")):
     cache_key = f"resolve-title|{title}"
     if cache_key in _TMDB_CACHE:
         return _TMDB_CACHE[cache_key]
+    # Quell-Tags und Jahresangaben aus dem Titel entfernen.
+    query = re.sub(r"\[I\].*?\[/I\]", "", title)
+    query = re.sub(r"\(\d{4}\)\s*$", "", query).strip()
+    query = query.replace("?", "").strip()
     out = {}
     try:
-        data = _tmdb_get("search/multi", {"query": title.strip()}) or {}
+        data = _tmdb_get("search/multi", {"query": query}) or {}
         for r in (data.get("results") or []):
             if r.get("media_type") not in ("movie", "tv"):
                 continue

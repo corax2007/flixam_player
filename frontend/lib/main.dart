@@ -4398,6 +4398,28 @@ class _HomePageState extends State<HomePage> {
     return out;
   }
 
+  Widget _resumePlaceholder(String title) {
+    final letters = title
+        .replaceAll(RegExp(r'[^A-Za-z0-9ÄÖÜäöüß ]'), ' ')
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+    return Container(
+      color: surf(context),
+      alignment: Alignment.center,
+      child: Text(
+        letters.isEmpty ? '?' : letters,
+        style: TextStyle(
+          color: accent(context),
+          fontSize: 28,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
   Widget _resumeCard(Map<String, dynamic> it) {
     final title = it['title']?.toString() ?? '';
     final poster = it['poster_url']?.toString() ?? '';
@@ -4420,9 +4442,9 @@ class _HomePageState extends State<HomePage> {
                         poster,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) =>
-                            Container(color: Colors.grey.shade900),
+                            _resumePlaceholder(title),
                       )
-                    : Container(color: Colors.grey.shade900),
+                    : _resumePlaceholder(title),
               ),
             ),
             const SizedBox(height: 4),
@@ -4458,11 +4480,14 @@ class _HomePageState extends State<HomePage> {
     final titles = prefs.positions.keys.where((t) {
       final pos = prefs.positionFor(t);
       final dur = prefs.durationFor(t);
+      final known = prefs.playingItems[t];
+      final hasCover =
+          (known?['poster_url']?.toString() ?? '').isNotEmpty;
       return pos >= 120 &&
           dur >= 600 &&
           dur > pos + 10 &&
           !_resumeMeta.containsKey(t) &&
-          !prefs.playingItems.containsKey(t);
+          !hasCover;
     }).take(40).toList();
     if (titles.isEmpty) return;
     final results = await Future.wait(
