@@ -756,6 +756,8 @@ class _HomePageState extends State<HomePage> {
     }
     // HLS braucht einen groesseren Puffer, sonst ruckeln Hoster-Streams.
     for (final entry in {
+      'cache': 'auto',
+      'cache-pause': 'no',
       'cache-secs': appSettings.hlsCacheSeconds.toString(),
       'demuxer-max-bytes': '${appSettings.demuxerMaxMb}MiB',
       'demuxer-max-burst-bytes': '${appSettings.demuxerBurstMb}MiB',

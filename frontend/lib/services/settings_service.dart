@@ -23,9 +23,9 @@ class AppSettings {
   );
 
   AppSettings({
-    this.hlsCacheSeconds = 30,
-    this.demuxerMaxMb = 128,
-    this.demuxerBurstMb = 64,
+    this.hlsCacheSeconds = 15,
+    this.demuxerMaxMb = 64,
+    this.demuxerBurstMb = 32,
     this.heroInBrowse = true,
     this.onlyAvailable = true,
     this.autoPlaySeason = false,
@@ -48,10 +48,12 @@ class AppSettings {
         final map = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
         int val(String key, int fallback) =>
             int.tryParse(map[key]?.toString() ?? '') ?? fallback;
+        int clampVal(String key, int fallback, int min, int max) =>
+            val(key, fallback).clamp(min, max);
         return AppSettings(
-          hlsCacheSeconds: val('hlsCacheSeconds', 30),
-          demuxerMaxMb: val('demuxerMaxMb', 128),
-          demuxerBurstMb: val('demuxerBurstMb', 64),
+          hlsCacheSeconds: clampVal('hlsCacheSeconds', 15, 0, 30),
+          demuxerMaxMb: clampVal('demuxerMaxMb', 64, 16, 128),
+          demuxerBurstMb: clampVal('demuxerBurstMb', 32, 8, 64),
           heroInBrowse: map['heroInBrowse'] as bool? ?? true,
           onlyAvailable: map['onlyAvailable'] as bool? ?? true,
           autoPlaySeason: map['autoPlaySeason'] as bool? ?? false,
