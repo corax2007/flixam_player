@@ -7,6 +7,7 @@ class UserPrefs {
   final Set<String> favorites = {};
   final Map<String, Map<String, dynamic>> favoriteItems = {};
   final Map<String, Map<String, dynamic>> playingItems = {};
+  final List<Map<String, dynamic>> playlist = [];
   final Map<String, int> positions = {};
   final Map<String, int> durations = {};
   final Map<String, int> myRatings = {};
@@ -41,6 +42,9 @@ class UserPrefs {
             playingItems[key] = value.cast<String, dynamic>();
           }
         });
+        for (final v in (map['playlist'] as List?) ?? []) {
+          if (v is Map) playlist.add(v.cast<String, dynamic>());
+        }
         final pos = map['positions'] as Map<String, dynamic>? ?? {};
         pos.forEach((key, value) {
           positions[key] = int.tryParse(value.toString()) ?? 0;
@@ -83,6 +87,29 @@ class UserPrefs {
   int durationFor(String title) => durations[title] ?? 0;
 
   int ratingFor(String title) => myRatings[title] ?? 0;
+
+  bool isInPlaylist(String title) =>
+      playlist.any((i) => i['title']?.toString() == title);
+
+  Future<void> addToPlaylist(Map<String, dynamic> item) async {
+    final title = item['title']?.toString() ?? '';
+    if (title.isEmpty || isInPlaylist(title)) return;
+    playlist.add({
+      'title': title,
+      'url': item['url']?.toString() ?? '',
+      'poster_url': item['poster_url']?.toString() ?? '',
+      'backdrop_url': item['backdrop_url']?.toString() ?? '',
+      'media_type': item['media_type']?.toString() ?? '',
+      'year': item['year']?.toString() ?? '',
+      'rating': item['rating'],
+    });
+    await _save();
+  }
+
+  Future<void> removeFromPlaylist(String title) async {
+    playlist.removeWhere((i) => i['title']?.toString() == title);
+    await _save();
+  }
 
   Future<void> clearProgress(String title) async {
     positions.remove(title);
@@ -175,6 +202,7 @@ class UserPrefs {
         'favorites': favorites.toList(),
         'favoriteItems': favoriteItems,
         'playingItems': playingItems,
+        'playlist': playlist,
         'positions': positions,
         'durations': durations,
         'myRatings': myRatings,

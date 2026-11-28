@@ -117,6 +117,7 @@ class _HomePageState extends State<HomePage> {
   bool providerNewLoading = false;
   bool showDownloads = false;
   bool showResume = false;
+  bool showPlaylist = false;
   final Map<String, dynamic> _resumeMeta = {};
   List<dynamic> downloadItems = [];
   Timer? _downloadTimer;
@@ -300,6 +301,7 @@ class _HomePageState extends State<HomePage> {
       showLiveTv = view == 'live';
       showDownloads = view == 'downloads';
       showResume = view == 'resume';
+      showPlaylist = view == 'playlist';
       if (view != 'home') heroItem = null;
     });
     if (view == 'home') _setWindowTitle('flixam_player');
@@ -382,7 +384,8 @@ class _HomePageState extends State<HomePage> {
             !showAddonCatalog &&
             !showLiveTv &&
             !showDownloads &&
-            !showResume) {
+            !showResume &&
+            !showPlaylist) {
           showHome = true;
         }
         loading = false;
@@ -1874,6 +1877,7 @@ class _HomePageState extends State<HomePage> {
           child: Text(prefs.isFavorite(item) ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'),
         ),
         const PopupMenuItem(value: 'resume', child: Text('Ab hier wiedergeben')),
+        const PopupMenuItem(value: 'playlist', child: Text('Zur Playlist')),
         if (prefs.positionFor(item['title']?.toString() ?? '') > 30)
           const PopupMenuItem(
             value: 'clearProgress',
@@ -1949,6 +1953,14 @@ class _HomePageState extends State<HomePage> {
       case 'fav':
         await prefs.toggleFavorite(item);
         if (mounted) setState(() {});
+        break;
+      case 'playlist':
+        await prefs.addToPlaylist(item);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Zur Playlist hinzugefügt')),
+          );
+        }
         break;
       case 'clearProgress':
         await prefs.clearProgress(item['title']?.toString() ?? '');
@@ -4023,7 +4035,7 @@ class _HomePageState extends State<HomePage> {
     final avail = _availableBadge(it);
     final cardWidth = _viewCardWidth();
     final posterHeight = _viewPosterHeight();
-    return TvFocusable(
+    final card = TvFocusable(
       autofocus: autofocus,
       onTap: () {
         // Auf Home bleiben - Auswahl oben im Hero-Feld anzeigen.
@@ -4144,6 +4156,25 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
+    );
+    return Draggable<Map<String, dynamic>>(
+      data: it,
+      feedback: Material(
+        color: Colors.transparent,
+        child: SizedBox(
+          width: 90,
+          height: 120,
+          child: it['poster_url']?.toString().isNotEmpty ?? false
+              ? Image.network(it['poster_url'].toString(), fit: BoxFit.cover)
+              : Container(
+                  color: accent(context),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.movie, color: Colors.black),
+                ),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: 0.35, child: card),
+      child: card,
     );
   }
 
@@ -4595,6 +4626,117 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  Future<void> _togglePlaylist() async {
+    if (showPlaylist) {
+      _activateView('home');
+      return;
+    }
+    _activateView('playlist');
+  }
+
+  List<Widget> _buildPlaylistSlivers() {
+    final items = prefs.playlist;
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Meine Playlist (${items.length})',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Schließen',
+                icon: const Icon(Icons.close),
+                onPressed: () => _activateView('home'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 140,
+            childAspectRatio: 2 / 3.2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 14,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (ctx, i) {
+              final it = items[i];
+              final card = _homeItemCard(it);
+              return Stack(
+                  children: [
+                    card,
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: IconButton(
+                        tooltip: 'Entfernen',
+                        icon: const Icon(Icons.close, size: 14,
+                            color: Colors.white),
+                        onPressed: () async {
+                          await prefs.removeFromPlaylist(
+                              it['title']?.toString() ?? '');
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ),
+                  ],
+                );
+            },
+            childCount: items.length,
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text(
+            'Ziehe einen Titel hierher, um ihn aus der Playlist zu entfernen:',
+            style: TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+        ),
+      ),
+      SliverToBoxAdapter(
+        child: DragTarget<Map<String, dynamic>>(
+          onAcceptWithDetails: (details) async {
+            await prefs.removeFromPlaylist(
+                details.data['title']?.toString() ?? '');
+            if (mounted) setState(() {});
+          },
+          builder: (context, candidate, rejected) => Container(
+            height: 90,
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: candidate.isNotEmpty
+                  ? Colors.red.withValues(alpha: 0.3)
+                  : surf(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: const Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.delete_outline, color: Colors.redAccent),
+                  SizedBox(width: 8),
+                  Text('Papierkorb', style: TextStyle(color: Colors.white70)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ];
+  }
+
   Future<void> _toggleResume() async {
     if (showResume) {
       _activateView('home');
@@ -4961,7 +5103,8 @@ class _HomePageState extends State<HomePage> {
       !showAddonCatalog &&
       !showLiveTv &&
       !showDownloads &&
-      !showResume;
+      !showResume &&
+      !showPlaylist;
 
   Widget _aetherNavItem(
     IconData icon,
@@ -5124,6 +5267,26 @@ class _HomePageState extends State<HomePage> {
               active: showProviderNew, onTap: _toggleProviderNew),
           _aetherNavItem(Icons.tv_outlined, 'Neue Serien',
               active: showNewSeries, onTap: _toggleNewSeries),
+          DragTarget<Map<String, dynamic>>(
+            onAcceptWithDetails: (details) async {
+              await prefs.addToPlaylist(details.data);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Zur Playlist: ${details.data['title'] ?? ''}',
+                    ),
+                  ),
+                );
+              }
+            },
+            builder: (context, candidate, rejected) => _aetherNavItem(
+              candidate.isNotEmpty ? Icons.playlist_add : Icons.queue_music,
+              'Playlist (${prefs.playlist.length})',
+              active: showPlaylist || candidate.isNotEmpty,
+              onTap: _togglePlaylist,
+            ),
+          ),
           _aetherNavItem(Icons.play_circle_outline, 'Fortsetzen',
               active: showResume, onTap: _toggleResume),
           _aetherNavItem(Icons.favorite_border, 'Favoriten', active: showFavorites,
@@ -5422,6 +5585,7 @@ class _HomePageState extends State<HomePage> {
                   myRating: prefs.ratingFor((heroItem as Map)['title']?.toString() ?? ''),
                   myNote: prefs.noteFor((heroItem as Map)['title']?.toString() ?? ''),
                 ),
+              if (showPlaylist) ..._buildPlaylistSlivers(),
               if (showResume) ..._buildResumePageSlivers(),
               if (showDownloads) ..._buildDownloadsSlivers(),
               if (showLiveTv) ..._buildLiveTvSlivers(),
