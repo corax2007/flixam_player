@@ -330,7 +330,17 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         rawHomeData = data;
         homeData = data;
-        showHome = true;
+        // Keine Spezialansicht (Downloads/Live TV/...) durch ein nachtraeglich
+        // fertig werdendes _loadHome ueberschreiben.
+        if (!showFavorites &&
+            !showSourceEpisodes &&
+            !showProviderNew &&
+            !showNewSeries &&
+            !showAddonCatalog &&
+            !showLiveTv &&
+            !showDownloads) {
+          showHome = true;
+        }
         loading = false;
       });
       final heroTitle = heroItem is Map
