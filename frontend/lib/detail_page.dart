@@ -168,6 +168,17 @@ class _DetailPageState extends State<DetailPage> {
     return following;
   }
 
+  List<Map<String, dynamic>> _episodesWithShow(
+    List<Map<String, dynamic>> episodes,
+  ) {
+    final show = widget.item['title']?.toString() ?? '';
+    return episodes.map((e) {
+      final m = Map<String, dynamic>.from(e);
+      m['showTitle'] = show;
+      return m;
+    }).toList();
+  }
+
   Widget _episodeTile(Map<String, dynamic> ep) {
     final still = ep['still_url']?.toString() ?? '';
     final no = (ep['episode'] as num?)?.toInt() ?? 0;
@@ -191,7 +202,9 @@ class _DetailPageState extends State<DetailPage> {
           ],
         );
         if (choice != 'fromHere') return;
-      widget.onPlayFromHere?.call(_followingEpisodes(ep));
+      widget.onPlayFromHere?.call(
+          _episodesWithShow(_followingEpisodes(ep)),
+        );
     }
     return GestureDetector(
       onLongPress: () => openMenu(const Offset(320, 320)),
@@ -230,7 +243,7 @@ class _DetailPageState extends State<DetailPage> {
             if (widget.onPlayFromHere != null) {
               final queue = _followingEpisodes(ep, sameSeasonOnly: true);
               if (queue.isNotEmpty) {
-                widget.onPlayFromHere?.call(queue);
+                widget.onPlayFromHere?.call(_episodesWithShow(queue));
                 return;
               }
             }

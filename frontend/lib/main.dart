@@ -797,9 +797,16 @@ class _HomePageState extends State<HomePage> {
   /// Countdown (Netflix/Amazon-Stil), nicht über die media_kit-Playlist.
   Future<void> _playEpisodes(List<Map<String, dynamic>> episodes) async {
     if (episodes.isEmpty) return;
+    String titleFor(Map<String, dynamic> ep) {
+      final show = ep['showTitle']?.toString() ?? '';
+      final epTitle = ep['title']?.toString() ?? 'Folge';
+      final no = ep['episode']?.toString() ?? '';
+      if (show.isEmpty) return epTitle;
+      return no.isEmpty ? '$show · $epTitle' : '$show · E$no – $epTitle';
+    }
+
     final first = episodes.first;
-    await _play(first['url']?.toString() ?? '',
-        first['title']?.toString() ?? 'Folge');
+    await _play(first['url']?.toString() ?? '', titleFor(first));
     _episodeQueue.clear();
     _episodeIndex = 0;
     for (final ep in episodes.skip(1)) {
@@ -810,7 +817,7 @@ class _HomePageState extends State<HomePage> {
         _episodeQueue.add({
           'stream': stream,
           'headers': Map<String, String>.from(r['headers'] ?? {}),
-          'title': ep['title']?.toString() ?? 'Folge',
+          'title': titleFor(ep),
         });
       } catch (_) {}
     }
