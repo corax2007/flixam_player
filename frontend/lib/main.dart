@@ -108,6 +108,9 @@ class _HomePageState extends State<HomePage> {
   bool showDownloads = false;
   List<dynamic> downloadItems = [];
   Timer? _downloadTimer;
+  bool zapping = false;
+  int zapSeconds = 5;
+  Timer? _zapTimer;
   bool showLiveTv = false;
   bool liveLoading = false;
   List<dynamic> liveChannels = [];
@@ -402,6 +405,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _downloadTimer?.cancel();
+    _zapTimer?.cancel();
     _autoRefreshTimer?.cancel();
     _controlsTimer?.cancel();
     _volumeSub?.cancel();
@@ -2223,6 +2227,45 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => downloadItems = items);
   }
 
+  void _stopZap() {
+    _zapTimer?.cancel();
+    _zapTimer = null;
+    if (zapping) setState(() => zapping = false);
+  }
+
+  void _zapStep(int delta) {
+    final vms = _liveChannelVms();
+    if (vms.isEmpty) return;
+    _selectLiveChannel(
+      (selectedLiveIndex + delta).clamp(0, vms.length - 1),
+      vms,
+    );
+  }
+
+  void _startZap() {
+    if (zapping) {
+      _stopZap();
+      return;
+    }
+    setState(() => zapping = true);
+    _zapTimer = Timer.periodic(Duration(seconds: zapSeconds), (_) {
+      if (!mounted || !showLiveTv || showPlayer) return;
+      _zapStep(1);
+    });
+  }
+
+  void _setZapSpeed(int seconds) {
+    zapSeconds = seconds;
+    setState(() {});
+    if (zapping) {
+      _zapTimer?.cancel();
+      _zapTimer = Timer.periodic(Duration(seconds: zapSeconds), (_) {
+        if (!mounted || !showLiveTv || showPlayer) return;
+        _zapStep(1);
+      });
+    }
+  }
+
   Future<void> _toggleDownloads() async {
     if (showDownloads) {
       _activateView('home');
@@ -2369,6 +2412,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleLiveTv() async {
     if (showLiveTv) {
+      _stopZap();
       _activateView('home');
       return;
     }
@@ -2445,6 +2489,36 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               IconButton(
+                tooltip: zapping ? 'Zap stoppen' : 'Zap starten',
+                icon: Icon(
+                  zapping ? Icons.stop_circle : Icons.play_circle_outline,
+                  color: zapping ? accent(context) : Colors.white70,
+                ),
+                onPressed: _startZap,
+              ),
+              IconButton(
+                tooltip: 'Vorheriger Sender',
+                icon: const Icon(Icons.skip_previous, size: 20),
+                onPressed: () => _zapStep(-1),
+              ),
+              IconButton(
+                tooltip: 'Nächster Sender',
+                icon: const Icon(Icons.skip_next, size: 20),
+                onPressed: () => _zapStep(1),
+              ),
+              DropdownButton<int>(
+                value: zapSeconds,
+                isDense: true,
+                items: const [
+                  DropdownMenuItem(value: 3, child: Text('3 s')),
+                  DropdownMenuItem(value: 5, child: Text('5 s')),
+                  DropdownMenuItem(value: 10, child: Text('10 s')),
+                ],
+                onChanged: (v) {
+                  if (v != null) _setZapSpeed(v);
+                },
+              ),
+              IconButton(
                 tooltip: liveMultiSelect ? 'Auswahl beenden' : 'Mehrfachauswahl',
                 icon: Icon(liveMultiSelect
                     ? Icons.checklist
@@ -2457,13 +2531,28 @@ class _HomePageState extends State<HomePage> {
               IconButton(
                 tooltip: 'Schließen',
                 icon: const Icon(Icons.close),
-                onPressed: () => setState(() => showLiveTv = false),
+                onPressed: () {
+                  _stopZap();
+                  _activateView('home');
+                },
               ),
             ],
           ),
         ),
       ),
     ];
+    if (zapping) {
+      list.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            'Zap läuft · wechselt alle $zapSeconds Sekunden '
+            '(Klick auf einen Sender stoppt)',
+            style: TextStyle(fontSize: 11, color: accent(context)),
+          ),
+        ),
+      ));
+    }
     if (liveMultiSelect) {
       list.add(SliverToBoxAdapter(
         child: Padding(
@@ -2612,8 +2701,11 @@ class _HomePageState extends State<HomePage> {
           onKeyEvent: (node, event) {
             if (event is KeyDownEvent &&
                 (event.logicalKey == LogicalKeyboardKey.arrowDown ||
-                    event.logicalKey == LogicalKeyboardKey.arrowUp)) {
-              final delta = event.logicalKey == LogicalKeyboardKey.arrowDown
+                    event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                    event.logicalKey == LogicalKeyboardKey.arrowRight ||
+                    event.logicalKey == LogicalKeyboardKey.arrowLeft)) {
+              final delta = (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                      event.logicalKey == LogicalKeyboardKey.arrowRight)
                   ? 1
                   : -1;
               _selectLiveChannel(
@@ -2639,6 +2731,7 @@ class _HomePageState extends State<HomePage> {
                         channel: vm,
                         selected: i == selectedLiveIndex,
                         onTap: () {
+                          if (zapping) _stopZap();
                           if (liveMultiSelect) {
                             setState(() {
                               if (!liveSelected.remove(vm.name)) {
