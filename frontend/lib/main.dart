@@ -110,6 +110,7 @@ class _HomePageState extends State<HomePage> {
   Timer? _downloadTimer;
   bool zapping = false;
   bool previewActive = false;
+  bool playerFromLive = false;
   int _zapToken = 0;
   int zapSeconds = 5;
   Timer? _zapTimer;
@@ -665,6 +666,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _play(String url, String title, {bool resume = false}) async {
+    playerFromLive = false;
     // Alte Favoriten/Items können Dart-URLs enthalten - das Linux-Backend
     // versteht nur plugin://-URLs.
     if (!api.useDirect && url.startsWith('flixam://')) {
@@ -2268,6 +2270,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _playLiveChannel(LiveChannelVm vm) async {
+    await _play(vm.url, vm.name);
+    playerFromLive = true;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _switchLiveChannel(int delta) async {
+    final vms = _liveChannelVms();
+    if (vms.isEmpty) return;
+    final idx = (selectedLiveIndex + delta) % vms.length;
+    setState(() => selectedLiveIndex = idx);
+    await _playLiveChannel(vms[idx]);
+  }
+
   void _startZap() {
     if (zapping) {
       _stopZap();
@@ -2773,8 +2789,7 @@ class _HomePageState extends State<HomePage> {
                             _selectLiveChannel(i, vms);
                           }
                         },
-                        onDoubleTap: () =>
-                            _play(vm.url, vm.name),
+                        onDoubleTap: () => _playLiveChannel(vm),
                         onFavorite: () async {
                           await prefs.toggleFavoriteChannel(vm.name);
                           if (mounted) setState(() {});
@@ -2798,7 +2813,7 @@ class _HomePageState extends State<HomePage> {
                       padding: const EdgeInsets.all(12),
                       child: EpgInspectorPanel(
                         vm: inspector,
-                        onPlay: () => _play(currentVm.url, currentVm.name),
+                        onPlay: () => _playLiveChannel(currentVm),
                         videoPreview: previewActive && !showPlayer
                             ? ClipRRect(
                                 borderRadius: const BorderRadius.all(
@@ -5137,6 +5152,12 @@ class _HomePageState extends State<HomePage> {
                             player.stop();
                             setState(() => showPlayer = false);
                           },
+                          if (playerFromLive)
+                            SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+                                _switchLiveChannel(-1),
+                          if (playerFromLive)
+                            SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                                _switchLiveChannel(1),
                         },
                         child: Video(controller: videoController, fit: BoxFit.contain),
                       ),
@@ -5253,20 +5274,39 @@ class _HomePageState extends State<HomePage> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
+                                    if (playerFromLive) ...[
+                                      IconButton(
+                                        tooltip: 'Vorheriger Sender',
+                                        onPressed: () => _switchLiveChannel(-1),
+                                        icon: const Icon(Icons.skip_previous),
+                                      ),
+                                      const SizedBox(width: 6),
+                                    ],
                                     IconButton(
+                                      tooltip: 'Zurück 10 s',
                                       onPressed: () => player.seek(
                                           player.state.position - const Duration(seconds: 10)),
                                       icon: const Icon(Icons.replay_10),
                                     ),
                                     IconButton(
+                                      tooltip: 'Play/Pause',
                                       onPressed: () => player.playOrPause(),
                                       icon: const Icon(Icons.play_arrow),
                                     ),
                                     IconButton(
+                                      tooltip: 'Vor 10 s',
                                       onPressed: () => player.seek(
                                           player.state.position + const Duration(seconds: 10)),
                                       icon: const Icon(Icons.forward_10),
                                     ),
+                                    if (playerFromLive) ...[
+                                      const SizedBox(width: 6),
+                                      IconButton(
+                                        tooltip: 'Nächster Sender',
+                                        onPressed: () => _switchLiveChannel(1),
+                                        icon: const Icon(Icons.skip_next),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ],
