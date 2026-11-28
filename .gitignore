@@ -37,3 +37,6 @@ frontend/linux/build/
 .DS_Store
 .idea/
 *.iml
+
+# Downloads (große MP4-Dateien)
+flixam_downloads/

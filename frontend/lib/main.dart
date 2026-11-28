@@ -252,6 +252,12 @@ class _HomePageState extends State<HomePage> {
     });
     _start();
     _loadAvailability();
+    if (!Platform.isAndroid) {
+      _loadDownloads();
+      _downloadTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (mounted) _loadDownloads();
+      });
+    }
     _autoRefreshTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       if (mounted && showHome) _refreshAll();
     });
@@ -2207,8 +2213,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _toggleDownloads() async {
     if (showDownloads) {
-      _downloadTimer?.cancel();
-      _downloadTimer = null;
       setState(() => showDownloads = false);
       return;
     }
@@ -2224,9 +2228,6 @@ class _HomePageState extends State<HomePage> {
       heroItem = null;
     });
     await _loadDownloads();
-    _downloadTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted && showDownloads) _loadDownloads();
-    });
   }
 
   List<Widget> _buildDownloadsSlivers() {
@@ -2309,8 +2310,21 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
                     value: status == 'done' ? 1.0 : progress,
-                    minHeight: 3,
+                    minHeight: 5,
                     color: accent(context),
+                    backgroundColor: Colors.white12,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    status == 'done'
+                        ? '100 % · abgeschlossen'
+                        : status == 'error'
+                            ? 'Fehler'
+                            : '${(progress * 100).round()} %'
+                                '${((d['duration'] as num?)?.toDouble() ?? 0) > 0
+                                    ? ' · ${_fmtClock(Duration(seconds: (d['elapsed'] as num?)?.toInt() ?? 0))} / ${_fmtClock(Duration(seconds: (d['duration'] as num).toInt()))}'
+                                    : ''}',
+                    style: const TextStyle(fontSize: 10, color: Colors.white54),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -4510,6 +4524,54 @@ class _HomePageState extends State<HomePage> {
           _aetherNavItem(Icons.settings_outlined, 'Einstellungen',
               active: false, onTap: _showSettings),
           const Spacer(),
+          if (!Platform.isAndroid && downloadItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: InkWell(
+                onTap: _toggleDownloads,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.download, size: 13, color: accent(context)),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            '${downloadItems.length} Download(s)',
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.white70),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: downloadItems
+                              .where((d) =>
+                                  (d['status']?.toString() ?? '') == 'running')
+                              .isEmpty
+                          ? 1.0
+                          : downloadItems
+                                  .where((d) =>
+                                      (d['status']?.toString() ?? '') ==
+                                      'running')
+                                  .map((d) =>
+                                      (d['progress'] as num?)?.toDouble() ?? 0)
+                                  .reduce((a, b) => a + b) /
+                              downloadItems
+                                  .where((d) =>
+                                      (d['status']?.toString() ?? '') ==
+                                      'running')
+                                  .length,
+                      minHeight: 3,
+                      color: accent(context),
+                      backgroundColor: Colors.white12,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           if (!Platform.isAndroid)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

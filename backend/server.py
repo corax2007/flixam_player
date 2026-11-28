@@ -1901,6 +1901,8 @@ def _download_worker(key: str, stream_url: str, headers: dict) -> None:
             duration = float((probe.stdout or "0").strip() or 0)
         except Exception:
             pass
+        with _DOWNLOAD_LOCK:
+            _DOWNLOADS[key]["duration"] = duration
         for line in proc.stdout or []:
             line = line.strip()
             if line.startswith("out_time_ms="):
