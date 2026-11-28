@@ -648,20 +648,33 @@ def tmdb_resolve_title(title: str = Query("")):
     query = re.sub(r"\[I\].*?\[/I\]", "", title)
     query = re.sub(r"\(\d{4}\)\s*$", "", query).strip()
     query = query.replace("?", "").strip()
+    # "Serie · E01 – Folgentitel" -> zuerst die Serie suchen.
+    candidates = [query]
+    if " · " in query:
+        candidates.append(query.split(" · ", 1)[0].strip())
+    if " - " in query:
+        candidates.append(query.split(" - ", 1)[0].strip())
+    if " – " in query:
+        candidates.append(query.split(" – ", 1)[0].strip())
     out = {}
-    try:
-        data = _tmdb_get("search/multi", {"query": query}) or {}
-        for r in (data.get("results") or []):
-            if r.get("media_type") not in ("movie", "tv"):
-                continue
-            item = _tmdb_to_item(
-                r, "movie" if r.get("media_type") == "movie" else "tv"
-            )
-            if item:
-                out = item
-                break
-    except Exception:
-        pass
+    for q in candidates:
+        if not q:
+            continue
+        try:
+            data = _tmdb_get("search/multi", {"query": q}) or {}
+            for r in (data.get("results") or []):
+                if r.get("media_type") not in ("movie", "tv"):
+                    continue
+                item = _tmdb_to_item(
+                    r, "movie" if r.get("media_type") == "movie" else "tv"
+                )
+                if item and item.get("poster_url"):
+                    out = item
+                    break
+        except Exception:
+            pass
+        if out:
+            break
     _TMDB_CACHE[cache_key] = out
     return out
 

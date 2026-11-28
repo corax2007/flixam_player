@@ -244,18 +244,28 @@ class TmdbService {
     final cached = _cache[key] as Map<String, dynamic>?;
     if (cached != null) return cached;
     Map<String, dynamic> out = {};
-    try {
-      final data = await _get('search/multi', {'query': title}) ?? {};
-      for (final r in (data['results'] as List?) ?? []) {
-        final mt = r['media_type']?.toString() ?? '';
-        if (mt != 'movie' && mt != 'tv') continue;
-        final it = await toItem(r, mt);
-        if (it != null) {
-          out = it;
-          break;
-        }
+    final candidates = <String>[title];
+    for (final sep in [' · ', ' - ', ' – ']) {
+      if (title.contains(sep)) {
+        candidates.add(title.split(sep).first.trim());
       }
-    } catch (_) {}
+    }
+    for (final q in candidates) {
+      if (q.isEmpty) continue;
+      try {
+        final data = await _get('search/multi', {'query': q}) ?? {};
+        for (final r in (data['results'] as List?) ?? []) {
+          final mt = r['media_type']?.toString() ?? '';
+          if (mt != 'movie' && mt != 'tv') continue;
+          final it = await toItem(r, mt);
+          if (it != null && (it['poster_url']?.toString() ?? '').isNotEmpty) {
+            out = it;
+            break;
+          }
+        }
+      } catch (_) {}
+      if (out.isNotEmpty) break;
+    }
     _cache[key] = out;
     return out;
   }
