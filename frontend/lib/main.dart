@@ -3679,7 +3679,7 @@ class _HomePageState extends State<HomePage> {
     final year = yearCtrl.text.trim();
     var out = input.where((i) {
       if (!_langOk(i)) return false;
-      if (!_coverAvailable(i)) return false;
+      if (_onlyAvailable() && !_coverAvailable(i)) return false;
       if (i is! Map) return false;
       if (year.isNotEmpty && (i['year']?.toString() ?? '') != year) return false;
       if (monthFilter != 'Alle') {
