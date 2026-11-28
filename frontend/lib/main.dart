@@ -1837,6 +1837,11 @@ class _HomePageState extends State<HomePage> {
           child: Text(prefs.isFavorite(item) ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'),
         ),
         const PopupMenuItem(value: 'resume', child: Text('Ab hier wiedergeben')),
+        if (prefs.positionFor(item['title']?.toString() ?? '') > 30)
+          const PopupMenuItem(
+            value: 'clearProgress',
+            child: Text('Aus Fortsetzen entfernen'),
+          ),
         if (!Platform.isAndroid)
           const PopupMenuItem(value: 'download', child: Text('Herunterladen')),
       ],
@@ -1906,6 +1911,11 @@ class _HomePageState extends State<HomePage> {
         break;
       case 'fav':
         await prefs.toggleFavorite(item);
+        if (mounted) setState(() {});
+        break;
+      case 'clearProgress':
+        await prefs.clearProgress(item['title']?.toString() ?? '');
+        _resumeMeta.remove(item['title']?.toString() ?? '');
         if (mounted) setState(() {});
         break;
       case 'download':
@@ -4434,17 +4444,46 @@ class _HomePageState extends State<HomePage> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                height: 160,
-                width: 120,
-                child: poster.isNotEmpty
-                    ? Image.network(
-                        poster,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) =>
-                            _resumePlaceholder(title),
-                      )
-                    : _resumePlaceholder(title),
+              child: Stack(
+                children: [
+                  SizedBox(
+                    height: 160,
+                    width: 120,
+                    child: poster.isNotEmpty
+                        ? Image.network(
+                            poster,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                _resumePlaceholder(title),
+                          )
+                        : _resumePlaceholder(title),
+                  ),
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        tooltip: 'Aus Fortsetzen entfernen',
+                        icon: const Icon(Icons.close, size: 14,
+                            color: Colors.white),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 24,
+                          minHeight: 24,
+                        ),
+                        onPressed: () async {
+                          await prefs.clearProgress(title);
+                          _resumeMeta.remove(title);
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 4),

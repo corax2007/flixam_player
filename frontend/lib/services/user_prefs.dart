@@ -84,6 +84,13 @@ class UserPrefs {
 
   int ratingFor(String title) => myRatings[title] ?? 0;
 
+  Future<void> clearProgress(String title) async {
+    positions.remove(title);
+    durations.remove(title);
+    playingItems.remove(title);
+    await _save();
+  }
+
   Future<void> rememberPlaying(Map<String, dynamic> item) async {
     final title = item['title']?.toString() ?? '';
     if (title.isEmpty) return;
