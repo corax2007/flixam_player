@@ -207,10 +207,6 @@ class _HomePageState extends State<HomePage> {
   int _episodeIndex = 0;
   List<Map<String, String>> heroSources = [];
   String? heroTrailerKey;
-  Player? hoverPlayer;
-  VideoController? hoverController;
-  bool hoverTrailer = false;
-  Timer? _hoverTimer;
   bool heroSourcesLoading = false;
   StreamSubscription<double>? _volumeSub;
   Timer? _autoRefreshTimer;
@@ -439,8 +435,6 @@ class _HomePageState extends State<HomePage> {
     _controlsTimer?.cancel();
     _volumeSub?.cancel();
     _listener.dispose();
-    _hoverTimer?.cancel();
-    hoverPlayer?.dispose();
     player.dispose();
     super.dispose();
   }
@@ -694,7 +688,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _play(String url, String title, {bool resume = false}) async {
-    _stopHoverTrailer();
     playerFromLive = false;
     _episodeQueue.clear();
     _episodeIndex = 0;
@@ -3333,7 +3326,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openTrailer(String key, String title) async {
-    _stopHoverTrailer();
     if (Platform.isAndroid) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -3398,42 +3390,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Wiederverwendbares Hero-Banner (Startseite und Browse-Auswahl).
-  void _stopHoverTrailer() {
-    _hoverTimer?.cancel();
-    hoverPlayer?.stop();
-    if (hoverTrailer) setState(() => hoverTrailer = false);
-  }
-
-  void _heroHoverChanged(bool entering, String? key) {
-    if (Platform.isAndroid || key == null || key.isEmpty) return;
-    if (!entering) {
-      _stopHoverTrailer();
-      return;
-    }
-    _hoverTimer?.cancel();
-    _hoverTimer = Timer(const Duration(milliseconds: 1500), () {
-      _startHoverTrailer(key);
-    });
-  }
-
-  Future<void> _startHoverTrailer(String key) async {
-    if (!mounted) return;
-    final resolved = await api.trailerStream(key);
-    final stream = resolved['stream_url']?.toString() ?? '';
-    if (stream.isEmpty || !mounted) return;
-    hoverPlayer ??= Player();
-    hoverController ??= VideoController(hoverPlayer!);
-    try {
-      await hoverPlayer!.setVolume(0);
-      await hoverPlayer!.open(Media(
-        stream,
-        httpHeaders: Map<String, String>.from(resolved['headers'] ?? {}),
-      ));
-      await hoverPlayer!.play();
-      if (mounted) setState(() => hoverTrailer = true);
-    } catch (_) {}
-  }
-
   Widget _heroBanner(
     Map<String, dynamic> item, {
     String eyebrow = 'NEU & BELIEBT',
@@ -3461,18 +3417,12 @@ class _HomePageState extends State<HomePage> {
           )
         : null;
     return SliverToBoxAdapter(
-      child: MouseRegion(
-        onEnter: (_) => _heroHoverChanged(true, trailerKey),
-        onExit: (_) => _heroHoverChanged(false, trailerKey),
-        child: SizedBox(
+      child: SizedBox(
         height: 340,
         child: Stack(
           fit: StackFit.expand,
           children: [
             if (backdrop.isNotEmpty && !aether)
-              if (hoverTrailer && hoverController != null)
-                Video(controller: hoverController!, fit: BoxFit.cover)
-              else
                 Image.network(
                   backdrop,
                   fit: BoxFit.cover,
@@ -3488,20 +3438,6 @@ class _HomePageState extends State<HomePage> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [Colors.transparent, bg(context)],
-                  ),
-                ),
-              ),
-            if (hoverTrailer)
-              const Positioned(
-                left: 12,
-                top: 12,
-                child: Text(
-                  'TRAILER',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2,
                   ),
                 ),
               ),
@@ -3724,7 +3660,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      ),
       ),
     );
   }
