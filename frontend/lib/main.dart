@@ -191,6 +191,11 @@ class _HomePageState extends State<HomePage> {
   int _lastSavedSecond = 0;
   /// Titel der Medien in der aktuellen Wiedergabeliste (Staffel am Stueck).
   final List<String> _queueTitles = [];
+  final List<Map<String, dynamic>> _episodeQueue = [];
+  int _episodeIndex = 0;
+  bool showNextCountdown = false;
+  int nextCountdown = 0;
+  Timer? _nextTimer;
   List<Map<String, String>> heroSources = [];
   String? heroTrailerKey;
   bool heroSourcesLoading = false;
@@ -230,8 +235,30 @@ class _HomePageState extends State<HomePage> {
       }
     });
     player.stream.completed.listen((completed) {
-      if (completed && currentPlayingTitle != null) {
+      if (!completed) return;
+      if (currentPlayingTitle != null) {
         prefs.savePosition(currentPlayingTitle!, 0);
+      }
+      if (_episodeQueue.isNotEmpty && _episodeIndex < _episodeQueue.length) {
+        if (appSettings.autoPlayDelay <= 0) {
+          _playNextEpisode();
+        } else {
+          setState(() {
+            nextCountdown = appSettings.autoPlayDelay;
+            showNextCountdown = true;
+          });
+          _nextTimer?.cancel();
+          _nextTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+            if (!mounted) return;
+            if (nextCountdown <= 1) {
+              _nextTimer?.cancel();
+              showNextCountdown = false;
+              _playNextEpisode();
+            } else {
+              setState(() => nextCountdown--);
+            }
+          });
+        }
       }
     });
     // Bei mehreren Folgen in der Wiedergabeliste Titel/Position pro Folge
@@ -667,6 +694,10 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _play(String url, String title, {bool resume = false}) async {
     playerFromLive = false;
+    _nextTimer?.cancel();
+    showNextCountdown = false;
+    _episodeQueue.clear();
+    _episodeIndex = 0;
     // Alte Favoriten/Items können Dart-URLs enthalten - das Linux-Backend
     // versteht nur plugin://-URLs.
     if (!api.useDirect && url.startsWith('flixam://')) {
@@ -694,6 +725,15 @@ class _HomePageState extends State<HomePage> {
       await _showPlaybackError(msg, title);
       return;
     }
+    await _openStream(streamUrl, headers, title, resume: resume);
+  }
+
+  Future<void> _openStream(
+    String streamUrl,
+    Map<String, String> headers,
+    String title, {
+    bool resume = false,
+  }) async {
     if (vpnEnabled) {
       try {
         (player.platform as dynamic)?.setProperty?.call('http-proxy', 'http://127.0.0.1:8080');
@@ -735,25 +775,44 @@ class _HomePageState extends State<HomePage> {
     _showPlayerControls();
   }
 
-  /// Mehrere Folgen nacheinander in die Wiedergabeliste laden - ohne
-  /// Pause zwischen den Episoden.
+  /// Mehrere Folgen vorbereiten. Der Wechsel läuft über unseren eigenen
+  /// Countdown (Netflix/Amazon-Stil), nicht über die media_kit-Playlist.
   Future<void> _playEpisodes(List<Map<String, dynamic>> episodes) async {
     if (episodes.isEmpty) return;
     final first = episodes.first;
     await _play(first['url']?.toString() ?? '',
         first['title']?.toString() ?? 'Folge');
+    _episodeQueue.clear();
+    _episodeIndex = 0;
     for (final ep in episodes.skip(1)) {
       try {
         final r = await api.resolve(ep['url']?.toString() ?? '');
         final stream = r['stream_url']?.toString() ?? '';
         if (stream.isEmpty) continue;
-        await player.add(Media(
-          stream,
-          httpHeaders: Map<String, String>.from(r['headers'] ?? {}),
-        ));
-        _queueTitles.add(ep['title']?.toString() ?? 'Folge');
+        _episodeQueue.add({
+          'stream': stream,
+          'headers': Map<String, String>.from(r['headers'] ?? {}),
+          'title': ep['title']?.toString() ?? 'Folge',
+        });
       } catch (_) {}
     }
+  }
+
+  Future<void> _playNextEpisode() async {
+    if (_episodeIndex >= _episodeQueue.length) return;
+    final item = _episodeQueue[_episodeIndex];
+    _episodeIndex++;
+    await _openStream(
+      item['stream']?.toString() ?? '',
+      Map<String, String>.from(item['headers'] ?? {}),
+      item['title']?.toString() ?? 'Folge',
+    );
+  }
+
+  void _cancelNextEpisode() {
+    _nextTimer?.cancel();
+    _episodeQueue.clear();
+    if (mounted) setState(() => showNextCountdown = false);
   }
 
   /// Folgen derselben Staffel ab der angeklickten Episode (Quellenansicht).
@@ -1430,6 +1489,35 @@ class _HomePageState extends State<HomePage> {
                     },
                     hint: 'Folgen automatisch nacheinander',
                   ),
+                  if (appSettings.autoPlaySeason)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Nächste Folge startet nach',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          DropdownButton<int>(
+                            value: appSettings.autoPlayDelay,
+                            items: const [
+                              DropdownMenuItem(value: 0, child: Text('sofort')),
+                              DropdownMenuItem(value: 5, child: Text('5 s')),
+                              DropdownMenuItem(value: 10, child: Text('10 s')),
+                              DropdownMenuItem(value: 15, child: Text('15 s')),
+                            ],
+                            onChanged: (v) async {
+                              if (v == null) return;
+                              setState(() => appSettings.autoPlayDelay = v);
+                              await appSettings.save();
+                              settingsRevision.value++;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   _settingsSwitch(
                     'Hero-Details beim Browse',
                     appSettings.heroInBrowse,
@@ -5163,6 +5251,82 @@ class _HomePageState extends State<HomePage> {
                         child: Video(controller: videoController, fit: BoxFit.contain),
                       ),
                     ),
+                    if (showNextCountdown &&
+                        _episodeIndex < _episodeQueue.length)
+                      Center(
+                        child: Container(
+                          width: 380,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xEE171512),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFD4AF6E).withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Nächste Folge in $nextCountdown s',
+                                style: const TextStyle(
+                                  color: Color(0xFFD4AF6E),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _episodeQueue[_episodeIndex]['title']?.toString() ??
+                                    '',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              LinearProgressIndicator(
+                                value: (1 -
+                                        nextCountdown /
+                                            (appSettings.autoPlayDelay <= 0
+                                                ? 10
+                                                : appSettings.autoPlayDelay))
+                                    .clamp(0.0, 1.0),
+                                minHeight: 4,
+                                color: const Color(0xFFD4AF6E),
+                                backgroundColor: Colors.white12,
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton(
+                                    onPressed: _cancelNextEpisode,
+                                    child: const Text('Abbrechen'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD4AF6E),
+                                      foregroundColor: Colors.black,
+                                    ),
+                                    onPressed: () {
+                                      _nextTimer?.cancel();
+                                      setState(() =>
+                                          showNextCountdown = false);
+                                      _playNextEpisode();
+                                    },
+                                    child: const Text('Jetzt starten'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Positioned(
                       top: 0,
                       left: 0,
