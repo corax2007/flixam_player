@@ -4361,6 +4361,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  bool get _noSpecialView =>
+      !showFavorites &&
+      !showSourceEpisodes &&
+      !showProviderNew &&
+      !showNewSeries &&
+      !showAddonCatalog &&
+      !showLiveTv &&
+      !showDownloads;
+
   Widget _aetherNavItem(
     IconData icon,
     String label, {
@@ -4505,11 +4514,11 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 10),
           _aetherNavItem(Icons.home_outlined, 'Home',
-              active: showHome, onTap: _goHome),
+              active: showHome && _noSpecialView, onTap: _goHome),
           _aetherNavItem(Icons.search, 'Suche',
               active: false, onTap: () => _search()),
           _aetherNavItem(Icons.movie_outlined, 'Filme',
-              active: !showHome && !showFavorites && !showProviderNew && !showNewSeries && !showAddonCatalog && !showLiveTv && !showSourceEpisodes,
+              active: !showHome && _noSpecialView,
               onTap: _browseRoot),
           if (!Platform.isAndroid)
             _aetherNavItem(Icons.download_for_offline_outlined, 'Downloads',
