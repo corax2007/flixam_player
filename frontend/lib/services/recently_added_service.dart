@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'gez_kino_service.dart';
 
 /// „Neu hinzugefügt": recenteste Einträge aus unseren Quellen.
 class RecentlyAddedService {
@@ -15,33 +14,6 @@ class RecentlyAddedService {
   Future<List<Map<String, dynamic>>> items({int limit = 60}) async {
     if (_cache != null) return _cache!.take(limit).toList();
     final out = <Map<String, dynamic>>[];
-
-    // GEZ Kino: timestamp der Mediathek-Liste
-    try {
-      final all = await GezKinoService.instance.load();
-      final sorted = all.whereType<Map<String, dynamic>>().toList()
-        ..sort((a, b) =>
-            (int.tryParse(b['timestamp']?.toString() ?? '') ?? 0)
-                .compareTo(int.tryParse(a['timestamp']?.toString() ?? '') ?? 0));
-      for (final m in sorted.take(80)) {
-        final video = m['video_url']?.toString() ?? '';
-        if (!video.startsWith('http')) continue;
-        out.add({
-          'title': m['title']?.toString() ?? '',
-          'original_language': 'de',
-          'year': m['year']?.toString(),
-          'poster_url': m['thumb']?.toString() ?? '',
-          'backdrop_url': m['thumb']?.toString() ?? '',
-          'overview': m['plot']?.toString() ?? '',
-          'rating': m['rating'],
-          'media_type': 'movie',
-          'isFolder': false,
-          'source': 'GEZ Kino',
-          'date': m['timestamp']?.toString(),
-          'url': video,
-        });
-      }
-    } catch (_) {}
 
     // Einschalten: releaseDate der aktuellen Filmliste
     try {
