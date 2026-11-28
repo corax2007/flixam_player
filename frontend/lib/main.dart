@@ -197,6 +197,8 @@ class _HomePageState extends State<HomePage> {
   Duration playerDuration = Duration.zero;
   bool playerControlsVisible = true;
   Timer? _controlsTimer;
+  Timer? _filterDebounce;
+  int _filterRequest = 0;
   String? currentPlayingTitle;
   bool _resumePending = false;
   int _resumeSeconds = 0;
@@ -433,6 +435,7 @@ class _HomePageState extends State<HomePage> {
     _zapTimer?.cancel();
     _autoRefreshTimer?.cancel();
     _controlsTimer?.cancel();
+    _filterDebounce?.cancel();
     _volumeSub?.cancel();
     _listener.dispose();
     player.dispose();
@@ -3748,13 +3751,17 @@ class _HomePageState extends State<HomePage> {
     return out;
   }
 
-  Future<void> _refreshFilteredViews() async {
+  Future<void> _refreshFilteredViews([int? requestId]) async {
+    final req = requestId ?? _filterRequest;
+    bool current() => req == _filterRequest;
     if (rawHomeData != null) {
       final year = yearCtrl.text.trim();
       if (year.isNotEmpty) {
         // Echte Jahres-Suche ueber TMDB Discover.
         final movies = await TmdbService.instance.byYear(year, 'movie');
+        if (!current()) return;
         final series = await TmdbService.instance.byYear(year, 'tv');
+        if (!current()) return;
         final yearMovies =
             await _applyFilters(movies, skipFsk: fskFilter == 'Alle');
         final yearSeries =
@@ -3777,6 +3784,7 @@ class _HomePageState extends State<HomePage> {
         final fskNum = fskFilter.replaceAll(RegExp(r'[^0-9]'), '');
         final movies = await TmdbService.instance.byCertification(fskNum, 'movie');
         final series = await TmdbService.instance.byCertification(fskNum, 'tv');
+        if (!current()) return;
         final fskMovies = await _applyFilters(movies, skipFsk: true);
         final fskSeries = await _applyFilters(series, skipFsk: true);
         final sections = <Map<String, dynamic>>[];
@@ -3817,13 +3825,19 @@ class _HomePageState extends State<HomePage> {
         homeData = {'hero': rawHomeData!['hero'], 'sections': sections};
       }
     }
+    if (!current()) return;
     providerMovies = await _applyFilters(rawProviderMovies);
     results = await _applyFilters(rawResults);
+    if (!current()) return;
     if (mounted) setState(() {});
   }
 
   void _onFilterChanged() {
-    _refreshFilteredViews();
+    _filterDebounce?.cancel();
+    _filterDebounce = Timer(const Duration(milliseconds: 400), () {
+      _filterRequest++;
+      _refreshFilteredViews(_filterRequest);
+    });
   }
 
   String _sourceLabel(dynamic item) {
