@@ -455,14 +455,24 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _search() async {
     setState(() => loading = true);
-    final items = await api.search(
-      addon,
-      searchCtrl.text,
-      year: yearCtrl.text,
-      genre: selectedGenre,
-      type: filterType,
-      source: Platform.isAndroid ? selectedSource : null,
-    );
+    final query = searchCtrl.text.trim();
+    final year = yearCtrl.text.trim();
+    List<dynamic> items;
+    if (query.isEmpty && year.isNotEmpty) {
+      // Nur ein Jahr eingegeben -> TMDB-Discover nach Jahr.
+      final movies = await TmdbService.instance.byYear(year, 'movie');
+      final series = await TmdbService.instance.byYear(year, 'tv');
+      items = [...movies, ...series].cast<dynamic>();
+    } else {
+      items = await api.search(
+        addon,
+        query,
+        year: year,
+        genre: selectedGenre,
+        type: filterType,
+        source: Platform.isAndroid ? selectedSource : null,
+      );
+    }
     setState(() {
       showHome = false;
       showFavorites = false;
@@ -474,7 +484,7 @@ class _HomePageState extends State<HomePage> {
       currentFolderUrl = null;
       currentFolderTitle = null;
       allEpisodesView = false;
-      currentTitle = 'Suche: ${searchCtrl.text}';
+      currentTitle = query.isEmpty ? 'Jahr $year' : 'Suche: $query';
       rawResults = items;
       results = items;
       loading = false;
